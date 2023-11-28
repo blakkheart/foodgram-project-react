@@ -77,7 +77,7 @@ def shopping_cart_download(request):
 
     y = 700
     for ingredient, value in ingredient_dict.items():
-        pdf_canvas.drawString(100, y, f"{ingredient}: {value[0]} {value[1]}")
+        pdf_canvas.drawString(100, y, f"{ingredient} ({value[1]}) — {value[0]}")
         y -= 20
     pdf_canvas.showPage()
     pdf_canvas.save()
