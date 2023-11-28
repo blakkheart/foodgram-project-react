@@ -44,7 +44,11 @@ class User(AbstractUser):
 class UserFollowing(models.Model):
     """Модель для подписок юзера."""
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    following_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='followed')
+    following_user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='followed'
+    )
     created = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self) -> str:
