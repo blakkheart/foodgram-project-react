@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 
 from rest_framework import generics
 from rest_framework import viewsets
+from rest_framework.pagination import PageNumberPagination
 
 from recipe.models import (
     Recipe,
@@ -12,7 +13,8 @@ from recipe.models import (
 )
 from api.serializers import (
     TagSerializer,
-    IngredientSerializer
+    IngredientSerializer,
+    RecipeSerializer,
 )
 
 User = get_user_model()
@@ -34,8 +36,12 @@ class UserViewSet:
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
-    pass
+    queryset = Recipe.objects.all()
+    serializer_class = RecipeSerializer
+    pagination_class = PageNumberPagination
+    # настроить фильтр по избранному, автору, списку покупок и тегам.
 
+    
 
 class ShoppingCartViewSet:
     pass

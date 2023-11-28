@@ -1,15 +1,20 @@
 import json
 from typing import Any
+
 from django.conf import settings
 from django.core.management import BaseCommand
-from recipe.models import Ingredient
 from django.db.utils import IntegrityError
+
+from recipe.models import (Ingredient, Tag)
+
 list_of_data = [
-    'ingredients'
+    'ingredients',
+    'tags',
 ]
 
 data_models_dict = {
     'ingredients': Ingredient,
+    'tags': Tag,
 }
 
 

@@ -4,6 +4,7 @@ from django.db import models
 
 
 class User(AbstractUser):
+    """Кастомная модель юзера."""
     # менеджер сделать для создания юзера ?
     username = models.CharField(
         max_length=150,
@@ -21,7 +22,18 @@ class User(AbstractUser):
         blank=True,
         related_name='followers'
     )
-
+    favourite = models.ManyToManyField(
+        "recipe.Recipe",
+        through='recipe.RecipeFavourite',
+        blank=True,
+        related_name='favourites',
+    )
+    shop_list = models.ManyToManyField(
+        "recipe.Recipe",
+        through='recipe.ReciepeShopList',
+        blank=True,
+        related_name='shop_list',
+    )
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
 
@@ -30,12 +42,13 @@ class User(AbstractUser):
 
 
 class UserFollowing(models.Model):
+    """Модель для подписок юзера."""
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     following_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='followed')
     created = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self) -> str:
-        return f'{self.following_user} follows {self.user}'
+        return f'{self.user} follows {self.following_user}'
 
     class Meta:
         constraints = (

@@ -7,6 +7,7 @@ User = get_user_model()
 
 
 class Tag(models.Model):
+    """Модель для тегов."""
     name = models.CharField(max_length=50, unique=True)
     color = models.CharField(max_length=25, unique=True)
     slug = models.SlugField(max_length=75, unique=True)
@@ -19,6 +20,7 @@ class Tag(models.Model):
 
 
 class Ingredient(models.Model):
+    """Модель для ингредиентов."""
     name = models.CharField(max_length=100, unique=True)
     measurement_unit = models.CharField(max_length=25)
 
@@ -30,6 +32,7 @@ class Ingredient(models.Model):
 
 
 class Recipe(models.Model):
+    """Модель для рецептов."""
     ingredients = models.ManyToManyField(
         Ingredient,
         through='RecipeIngredient',
@@ -43,19 +46,6 @@ class Recipe(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='recipies')
     pub_date = models.DateTimeField(auto_now=False, auto_now_add=True)
 
-    favourite = models.ManyToManyField(
-        User,
-        through='RecipeFavourite',
-        blank=True,
-        related_name='favourites'
-    )
-    shop_list = models.ManyToManyField(
-        User,
-        through='ReciepeShopList',
-        blank=True,
-        related_name='shop_list'
-    )
-
     def __str__(self) -> str:
         return self.name
 
@@ -64,6 +54,7 @@ class Recipe(models.Model):
 
 
 class RecipeFavourite(models.Model):
+    """Промежуточная модель для избранных рецептов."""
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
     added = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -81,6 +72,7 @@ class RecipeFavourite(models.Model):
 
 
 class ReciepeShopList(models.Model):
+    """Промежуточная модель для рецептов в корзине."""
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
     added = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -98,6 +90,7 @@ class ReciepeShopList(models.Model):
 
 
 class RecipeIngredient(models.Model):
+    """Промежуточная модель для ингредиентов в рецепте."""
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
     ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE)
     amount = models.FloatField(validators=(MinValueValidator(0),))
