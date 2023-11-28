@@ -2,17 +2,23 @@ from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import get_user_model
 from rest_framework import generics
+from django.http import FileResponse
+from io import BytesIO
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 from recipe.models import (
     Recipe,
     Tag,
-    Ingredient
+    Ingredient,
+    RecipeIngredient,
 )
 from api.serializers import (
     TagSerializer,
     IngredientSerializer,
     RecipeSerializer,
-    UserSerializer
+    UserSerializer,
 )
 
 User = get_user_model()
@@ -45,9 +51,42 @@ class RecipeViewSet(viewsets.ModelViewSet):
 class ShoppingCartViewSet(viewsets.ModelViewSet):
     pass
 
-#поправить моделвьюсет на иное
-class ShoppingCartDownloadViewSet(viewsets.ModelViewSet):
-    pass
+
+def shopping_cart_download(request):
+
+    buffer = BytesIO()
+    pdf_canvas = canvas.Canvas(buffer)
+    pdfmetrics.registerFont(TTFont('Verdana', 'Verdana.ttf'))
+    pdf_canvas.setFont('Verdana', 8)
+    pdf_canvas.drawString(100, 750, "Shop Cart")
+
+    current_user = request.user
+    user = User.objects.get(username=current_user)
+    objects = user.shop_list.select_related('author').all()
+    ingredient_dict = {}
+    for obj in objects:
+        ingredients = RecipeIngredient.objects.filter(recipe=obj)
+        for ingredient in ingredients:
+            name = ingredient.ingredient.name
+            amount = ingredient.amount
+            units = ingredient.ingredient.measurement_unit
+            if ingredient_dict.get(name):
+                ingredient_dict[name][0] += amount
+            else:
+                ingredient_dict[name] = [amount, units]
+
+    y = 700
+    for ingredient, value in ingredient_dict.items():
+        pdf_canvas.drawString(100, y, f"{ingredient}: {value[0]} {value[1]}")
+        y -= 20
+    pdf_canvas.showPage()
+    pdf_canvas.save()
+    buffer.seek(0)
+    response = FileResponse(buffer,
+                            as_attachment=True,
+                            filename='shop_cart.pdf')
+    return response
+
 
 
 class FavoriteViewSet:
@@ -58,12 +97,11 @@ class SubscriptionViewSet:
     pass
 
 #поправить моделвьюсет на иное
-class UserSubscriptionViewSet(viewsets.ModelViewSet):
+class UserSubscriptionViewSet(generics.ListAPIView):
     serializer_class = UserSerializer
 
     def get_queryset(self):
         current_user = self.request.user
         user = User.objects.get(username=current_user)
-        print(user)
         return user.followers.all()
     
