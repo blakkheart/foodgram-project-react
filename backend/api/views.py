@@ -1,24 +1,29 @@
-from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import get_user_model
-from rest_framework import generics
+from rest_framework import generics, status, viewsets
 from django.http import FileResponse
 from io import BytesIO
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from django.shortcuts import get_object_or_404
 
 from recipe.models import (
     Recipe,
     Tag,
     Ingredient,
     RecipeIngredient,
+    ReciepeShopList,
+    RecipeFavourite,
 )
 from api.serializers import (
     TagSerializer,
     IngredientSerializer,
     RecipeSerializer,
     UserSerializer,
+    ShoppingCartOrFavoriteRecipeSerializer,
 )
 
 User = get_user_model()
@@ -47,50 +52,122 @@ class RecipeViewSet(viewsets.ModelViewSet):
     pagination_class = PageNumberPagination
     # настроить фильтр по избранному, автору, списку покупок и тегам.
 
-#поправить моделвьюсет на иное
-class ShoppingCartViewSet(viewsets.ModelViewSet):
-    pass
+    @action(
+            methods=('post', 'delete'),
+            detail=True,
+            serializer_class=ShoppingCartOrFavoriteRecipeSerializer
+    )
+    def shopping_cart(self, request, pk=None):
 
+        user = request.user
+        recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
 
-def shopping_cart_download(request):
+        if request.method == 'POST':
+            obj, created = ReciepeShopList.objects.get_or_create(
+                user=user,
+                recipe=recipe
+            )
+            if created:
+                serializer = self.get_serializer(recipe)
+                return Response(
+                    serializer.data,
+                    status=status.HTTP_201_CREATED
+                )
+            return Response(
+                {'errors': 'Already exists'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-    buffer = BytesIO()
-    pdf_canvas = canvas.Canvas(buffer)
-    pdfmetrics.registerFont(TTFont('Verdana', 'Verdana.ttf'))
-    pdf_canvas.setFont('Verdana', 8)
-    pdf_canvas.drawString(100, 750, "Shop Cart")
+        if request.method == 'DELETE':
+            try:
+                obj = ReciepeShopList.objects.get(user=user, recipe=recipe)
+                obj.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            except ReciepeShopList.DoesNotExist:
+                return Response(
+                    {'errors': 'Does not exist'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-    current_user = request.user
-    user = User.objects.get(username=current_user)
-    objects = user.shop_list.select_related('author').all()
-    ingredient_dict = {}
-    for obj in objects:
-        ingredients = RecipeIngredient.objects.filter(recipe=obj)
-        for ingredient in ingredients:
-            name = ingredient.ingredient.name
-            amount = ingredient.amount
-            units = ingredient.ingredient.measurement_unit
-            if ingredient_dict.get(name):
-                ingredient_dict[name][0] += amount
-            else:
-                ingredient_dict[name] = [amount, units]
+    @action(methods=('get',), detail=False)
+    def shopping_cart_download(self, request, pk=None):
 
-    y = 700
-    for ingredient, value in ingredient_dict.items():
-        pdf_canvas.drawString(100, y, f"{ingredient} ({value[1]}) — {value[0]}")
-        y -= 20
-    pdf_canvas.showPage()
-    pdf_canvas.save()
-    buffer.seek(0)
-    response = FileResponse(buffer,
-                            as_attachment=True,
-                            filename='shop_cart.pdf')
-    return response
+        if not request.user.is_authenticated:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
+        buffer = BytesIO()
+        pdf_canvas = canvas.Canvas(buffer)
+        pdfmetrics.registerFont(TTFont('Verdana', 'Verdana.ttf'))
+        pdf_canvas.setFont('Verdana', 8)
+        pdf_canvas.drawString(100, 750, "Shopping Cart")
 
+        current_user = request.user
+        user = User.objects.get(username=current_user)
+        objects = user.shop_list.select_related('author').all()
+        ingredient_dict = {}
+        for obj in objects:
+            ingredients = RecipeIngredient.objects.filter(recipe=obj)
+            for ingredient in ingredients:
+                name = ingredient.ingredient.name
+                amount = ingredient.amount
+                units = ingredient.ingredient.measurement_unit
+                if ingredient_dict.get(name):
+                    ingredient_dict[name][0] += amount
+                else:
+                    ingredient_dict[name] = [amount, units]
 
-class FavoriteViewSet:
-    pass
+        y = 700
+        for ingredient, value in ingredient_dict.items():
+            pdf_canvas.drawString(
+                100,
+                y,
+                f"{ingredient} ({value[1]}) — {value[0]}"
+            )
+            y -= 20
+        pdf_canvas.showPage()
+        pdf_canvas.save()
+        buffer.seek(0)
+        response = FileResponse(buffer,
+                                as_attachment=True,
+                                filename='shop_cart.pdf')
+        return response
+
+    @action(
+            methods=('post', 'delete'),
+            detail=True,
+            serializer_class=ShoppingCartOrFavoriteRecipeSerializer
+    )
+    def favorite(self, request, pk=None):
+        user = request.user
+        recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
+
+        if request.method == 'POST':
+            obj, created = RecipeFavourite.objects.get_or_create(
+                user=user,
+                recipe=recipe
+            )
+            if created:
+                serializer = self.get_serializer(recipe)
+                return Response(
+                    serializer.data,
+                    status=status.HTTP_201_CREATED
+                )
+            return Response(
+                {'errors': 'Already exists'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if request.method == 'DELETE':
+            try:
+                obj = RecipeFavourite.objects.get(user=user, recipe=recipe)
+                obj.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            except RecipeFavourite.DoesNotExist:
+                return Response(
+                    {'errors': 'Does not exist'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
 
 
 class SubscriptionViewSet:
@@ -104,4 +181,3 @@ class UserSubscriptionViewSet(generics.ListAPIView):
         current_user = self.request.user
         user = User.objects.get(username=current_user)
         return user.followers.all()
-    

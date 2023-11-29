@@ -120,3 +120,10 @@ class RecipeSerializer(serializers.ModelSerializer):
             return True
         except ObjectDoesNotExist:
             return False
+
+
+class ShoppingCartOrFavoriteRecipeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Recipe
+        fields = ('id', 'name', 'image', 'cooking_time')
+        read_only_fields = ('id', 'name', 'image', 'cooking_time')
