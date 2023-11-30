@@ -1,14 +1,16 @@
+from io import BytesIO
+
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import get_user_model
 from rest_framework import generics, status, viewsets
 from django.http import FileResponse
-from io import BytesIO
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 from recipe.models import (
     Recipe,
@@ -24,7 +26,11 @@ from api.serializers import (
     RecipeSerializer,
     UserSerializer,
     ShoppingCartOrFavoriteRecipeSerializer,
+    RecipeSerializerPOST,
 )
+
+from api.permissions import IsAuthor
+
 
 User = get_user_model()
 
@@ -47,10 +53,18 @@ class UserViewSet:
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
-    queryset = Recipe.objects.all()
-    serializer_class = RecipeSerializer
+    queryset = Recipe.objects.prefetch_related('ingredients', 'tags').all()
     pagination_class = PageNumberPagination
+    http_method_names = ['get', 'post', 'delete', 'patch']
     # настроить фильтр по избранному, автору, списку покупок и тегам.
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return RecipeSerializer
+        return RecipeSerializerPOST
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
 
     @action(
             methods=('post', 'delete'),
@@ -169,11 +183,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 )
 
 
-
-class SubscriptionViewSet:
-    pass
-
-#поправить моделвьюсет на иное
 class UserSubscriptionViewSet(generics.ListAPIView):
     serializer_class = UserSerializer
 

@@ -28,12 +28,14 @@ class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
         fields = ('id', 'name', 'color', 'slug')
+        read_only_fields = ('id', 'name', 'color', 'slug')
 
 
 class IngredientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ingredient
         fields = ('id', 'name', 'measurement_unit')
+        read_only_fields = ('id', 'name', 'measurement_unit')
 
 
 class IngredientRecipeSerializer(serializers.ModelSerializer):
@@ -83,9 +85,10 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class RecipeSerializer(serializers.ModelSerializer):
+    image = Base64ImageField()
     tags = TagSerializer(many=True,)
     ingredients = IngredientRecipeSerializer(many=True,)
-    author = UserSerializer()
+    author = UserSerializer(read_only=True)
     is_favourited = serializers.SerializerMethodField()
     is_in_shipping_cart = serializers.SerializerMethodField()
 
@@ -127,3 +130,85 @@ class ShoppingCartOrFavoriteRecipeSerializer(serializers.ModelSerializer):
         model = Recipe
         fields = ('id', 'name', 'image', 'cooking_time')
         read_only_fields = ('id', 'name', 'image', 'cooking_time')
+
+
+
+
+"""------------------------------"""
+
+class IngredientSerializePOST(serializers.Serializer):
+    id = serializers.IntegerField()
+    amount = serializers.FloatField()
+    class Meta:
+        fields = ('id', 'amount')
+
+
+class RecipeSerializerPOST(serializers.ModelSerializer):
+    image = Base64ImageField()
+    ingredients = IngredientSerializePOST(many=True)
+    author = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Recipe
+        fields = (
+            'id',
+            'tags',
+            'author',
+            'ingredients',
+            'name',
+            'image',
+            'text',
+            'cooking_time',   
+        )
+
+    def create(self, validated_data):
+        ingredients = validated_data.pop('ingredients')
+        tags = validated_data.pop('tags')
+        recipe = Recipe.objects.create(**validated_data)
+        recipe.tags.set(tags)
+        for ingredient in ingredients:
+            RecipeIngredient.objects.create(
+                ingredient=Ingredient.objects.get(pk=ingredient.get('id')),
+                recipe=recipe,
+                amount=ingredient.get('amount')
+            )
+        return recipe
+
+    def create_or_update_ingredients(self, ingredients, recipe_id):
+        ingr_ids = []
+        for ingredient in ingredients:
+            ingredient_instance, created = (
+                RecipeIngredient.
+                objects.
+                update_or_create(
+                    ingredient=Ingredient.objects.get(id=ingredient.get('id')),
+                    recipe=Recipe.objects.get(id=recipe_id),
+                    amount=ingredient.get('amount'),
+                    defaults=ingredient)
+            )
+            ingr_ids.append(ingredient_instance.pk)
+        return ingr_ids
+
+    def update(self, instance, validated_data):
+        ingredients_data = validated_data.pop('ingredients', [])
+        recipe_id = instance.id
+        instance.name = validated_data.get('name', instance.name)
+        instance.text = validated_data.get('text', instance.text)
+        instance.cooking_time = validated_data.get(
+            'cooking_time',
+            instance.cooking_time
+        )
+        instance.image = validated_data.get('image', instance.image)
+        instance.ingredients.set(
+            self.create_or_update_ingredients(ingredients_data, recipe_id))
+        if validated_data.get('tags'):
+            instance.tags.set(validated_data.get('tags'))
+        instance.save()
+        return instance
+
+    def to_representation(self, value):
+        if isinstance(value, Recipe):
+            serializer = RecipeSerializer(value, context=self.context)
+        else:
+            raise Exception('Unexpected type of tagged object')
+        return serializer.data
