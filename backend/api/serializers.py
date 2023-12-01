@@ -89,6 +89,19 @@ class UserSerializer(serializers.ModelSerializer):
             return False
 
 
+class UserCreateSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = User
+        fields = (
+            'email',
+            'id',
+            'username',
+            'first_name',
+            'last_name',
+        )
+
+
 class RecipeSerializer(serializers.ModelSerializer):
     image = Base64ImageField()
     tags = TagSerializer(many=True,)
@@ -274,9 +287,3 @@ class UserSubSerializer(serializers.ModelSerializer):
         )
         UserFollowing.objects.create(user=user_to_follow, following_user=user)
         return user_to_follow
-
-
-'''
-Поле регистрации возвращается неверный порядок полей.
-
-'''

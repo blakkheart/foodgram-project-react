@@ -1,6 +1,5 @@
 from io import BytesIO
 
-from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import get_user_model
 from rest_framework import generics, status, viewsets
 from django.http import FileResponse
@@ -10,8 +9,9 @@ from reportlab.pdfbase.ttfonts import TTFont
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
-from rest_framework.permissions import IsAuthenticatedOrReadOnly, AllowAny
-
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated, AllowAny
+from djoser.views import UserViewSet as UVS
+from django_filters import rest_framework as filters
 
 from recipe.models import (
     Recipe,
@@ -33,8 +33,9 @@ from api.serializers import (
 
 from user.models import UserFollowing
 
-from api.permissions import IsAuthor
+from api.permissions import IsAuthor, RecipePermissions
 
+from api.filters import RecipeFilter, IngredientFilter
 
 User = get_user_model()
 
@@ -48,19 +49,17 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
-    search_fields = ('name', )
     pagination_class = None
-
-
-class UserViewSet:
-    pass
+    filter_backends = (filters.DjangoFilterBackend,)
+    filterset_class = IngredientFilter
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.prefetch_related('ingredients', 'tags').all()
-    pagination_class = PageNumberPagination
     http_method_names = ['get', 'post', 'delete', 'patch']
-    # настроить фильтр по избранному, автору, списку покупок и тегам.
+    filter_backends = (filters.DjangoFilterBackend,)
+    filterset_class = RecipeFilter
+    permission_classes = (RecipePermissions, )
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -73,7 +72,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @action(
             methods=('post', 'delete'),
             detail=True,
-            serializer_class=ShoppingCartOrFavoriteRecipeSerializer
+            serializer_class=ShoppingCartOrFavoriteRecipeSerializer,
+            permission_classes=(IsAuthenticated,),
     )
     def shopping_cart(self, request, pk=None):
 
@@ -107,7 +107,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-    @action(methods=('get',), detail=False)
+    @action(
+            methods=('get',),
+            detail=False,
+            permission_classes=(IsAuthenticated,),
+        )
     def shopping_cart_download(self, request, pk=None):
 
         if not request.user.is_authenticated:
@@ -153,7 +157,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @action(
             methods=('post', 'delete'),
             detail=True,
-            serializer_class=ShoppingCartOrFavoriteRecipeSerializer
+            serializer_class=ShoppingCartOrFavoriteRecipeSerializer,
+            permission_classes=(IsAuthenticated,),
     )
     def favorite(self, request, pk=None):
         user = request.user
@@ -189,6 +194,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
 class UserSubscriptionView(generics.ListAPIView):
     serializer_class = UserSerializer
+    permission_classes = (IsAuthenticatedOrReadOnly, )
 
     def get_queryset(self):
         user = self.request.user
@@ -210,3 +216,44 @@ class SubscribeView(generics.CreateAPIView, generics.DestroyAPIView):
             following_user=user
         )
         model_to_delete.delete()
+
+
+class DjoserUserCustomView(UVS):
+    '''Переопределяем джосеровский вьюсет, ограничевая едпоинты и методы.'''
+    http_method_names = ['get', 'post']
+
+    @action(methods=['GET'], detail=False)
+    def me(self, request, *args, **kwargs):
+        return super().me(request, *args, **kwargs)
+
+    @action(methods=[''], detail=False)
+    def activation(self, request, *args, **kwargs):
+        return super().activation(request, *args, **kwargs)
+
+    @action(methods=[''], detail=False)
+    def resend_activation(self, request, *args, **kwargs):
+        return super().resend_activation(request, *args, **kwargs)
+
+    @action(methods=['POST'], detail=False)
+    def set_password(self, request, *args, **kwargs):
+        return super().set_password(request, *args, **kwargs)
+
+    @action(methods=[''], detail=False)
+    def reset_password(self, request, *args, **kwargs):
+        return super().reset_password(request, *args, **kwargs)
+
+    @action(methods=[''], detail=False)
+    def reset_password_confirm(self, request, *args, **kwargs):
+        return super().reset_password_confirm(request, *args, **kwargs)
+
+    @action(methods=[''], detail=False)
+    def set_username(self, request, *args, **kwargs):
+        return super().set_username(request, *args, **kwargs)
+
+    @action(methods=[''], detail=False)
+    def reset_username(self, request, *args, **kwargs):
+        return super().reset_username(request, *args, **kwargs)
+
+    @action(methods=[''], detail=False)
+    def reset_username_confirm(self, request, *args, **kwargs):
+        return super().reset_username_confirm(request, *args, **kwargs)
