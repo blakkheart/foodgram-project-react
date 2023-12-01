@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.core.files.base import ContentFile
 from django.core.exceptions import ObjectDoesNotExist
+from django.shortcuts import get_object_or_404
 
 from recipe.models import (
     Recipe,
@@ -11,6 +12,8 @@ from recipe.models import (
     Ingredient,
     RecipeIngredient,
 )
+
+from user.models import UserFollowing
 
 User = get_user_model()
 
@@ -77,6 +80,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_is_subscribed(self, obj):
         user = self.context.get('request').user
+        if not user.is_authenticated:
+            return False
         try:
             User.objects.filter(pk=obj.pk).get(follower=user)
             return True
@@ -132,13 +137,10 @@ class ShoppingCartOrFavoriteRecipeSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'name', 'image', 'cooking_time')
 
 
-
-
-"""------------------------------"""
-
 class IngredientSerializePOST(serializers.Serializer):
     id = serializers.IntegerField()
     amount = serializers.FloatField()
+
     class Meta:
         fields = ('id', 'amount')
 
@@ -158,7 +160,7 @@ class RecipeSerializerPOST(serializers.ModelSerializer):
             'name',
             'image',
             'text',
-            'cooking_time',   
+            'cooking_time',
         )
 
     def create(self, validated_data):
@@ -212,3 +214,69 @@ class RecipeSerializerPOST(serializers.ModelSerializer):
         else:
             raise Exception('Unexpected type of tagged object')
         return serializer.data
+
+
+class UserSubSerializer(serializers.ModelSerializer):
+    is_subscribed = serializers.SerializerMethodField()
+    recipes_count = serializers.SerializerMethodField()
+    recipes = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            'email',
+            'id',
+            'username',
+            'first_name',
+            'last_name',
+            'is_subscribed',
+            'recipes',
+            'recipes_count',
+
+        )
+        read_only_fields = (
+            'email',
+            'id',
+            'username',
+            'first_name',
+            'last_name',
+            'is_subscribed',
+            'recipes',
+            'recipes_count',
+        )
+
+    def get_is_subscribed(self, obj):
+        user = self.context.get('request').user
+        if not user.is_authenticated:
+            return False
+        try:
+            User.objects.filter(pk=obj.pk).get(follower=user)
+            return True
+        except ObjectDoesNotExist:
+            return False
+
+    def get_recipes(self, obj):
+        user = get_object_or_404(User, pk=obj.pk)
+        recipes = user.recipies.all()
+        return ShoppingCartOrFavoriteRecipeSerializer(recipes, many=True).data
+
+    def get_recipes_count(self, obj):
+        user = get_object_or_404(User, pk=obj.pk)
+        counter = user.recipies.count()
+        return counter
+
+    def create(self, validated_data):
+        id_user_to_follow = self.context.get('view').kwargs.get('pk')
+        user_to_follow = get_object_or_404(User, pk=id_user_to_follow)
+        user = get_object_or_404(
+            User,
+            username=self.context.get('request').user.username
+        )
+        UserFollowing.objects.create(user=user_to_follow, following_user=user)
+        return user_to_follow
+
+
+'''
+Поле регистрации возвращается неверный порядок полей.
+
+'''

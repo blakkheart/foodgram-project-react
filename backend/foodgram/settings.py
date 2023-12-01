@@ -28,7 +28,8 @@ INSTALLED_APPS = [
 
     # 3rd party apps
     'djoser',
-    'rest_framework'
+    'rest_framework',
+    'rest_framework.authtoken',
 ]
 
 MIDDLEWARE = [
@@ -114,7 +115,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny'
     ],
 
-    'DEFAULT_AUTHENTICATION_CLASSESS': [
+    'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
     ],
 
@@ -125,12 +126,13 @@ REST_FRAMEWORK = {
 
 DJOSER = {
     'HIDE_USERS': False,
+    'PERMISSIONS': {
+        'user': ['api.permissions.DjoserMePermission'],
+        'user_list': ['rest_framework.permissions.AllowAny'],
+    },
     'SERIALIZERS': {
         'user': 'api.serializers.UserSerializer',
         'current_user': 'api.serializers.UserSerializer',
     },
-    'PERMISSIONS': {
-        'user': ['rest_framework.permissions.AllowAny'],
-        'user_list': ['rest_framework.permissions.AllowAny'],
-    }
+    
 }

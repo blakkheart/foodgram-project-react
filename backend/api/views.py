@@ -10,7 +10,8 @@ from reportlab.pdfbase.ttfonts import TTFont
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, AllowAny
+
 
 from recipe.models import (
     Recipe,
@@ -27,7 +28,10 @@ from api.serializers import (
     UserSerializer,
     ShoppingCartOrFavoriteRecipeSerializer,
     RecipeSerializerPOST,
+    UserSubSerializer,
 )
+
+from user.models import UserFollowing
 
 from api.permissions import IsAuthor
 
@@ -183,10 +187,26 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 )
 
 
-class UserSubscriptionViewSet(generics.ListAPIView):
+class UserSubscriptionView(generics.ListAPIView):
     serializer_class = UserSerializer
 
     def get_queryset(self):
-        current_user = self.request.user
-        user = User.objects.get(username=current_user)
+        user = self.request.user
         return user.followers.all()
+
+
+class SubscribeView(generics.CreateAPIView, generics.DestroyAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSubSerializer
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+
+    def perform_destroy(self, instance):
+        user = get_object_or_404(User, username=self.request.user.username)
+        id_user_to_unfollow = self.kwargs.get('pk')
+        user_to_unfollow = get_object_or_404(User, pk=id_user_to_unfollow)
+        model_to_delete = get_object_or_404(
+            UserFollowing,
+            user=user_to_unfollow,
+            following_user=user
+        )
+        model_to_delete.delete()
