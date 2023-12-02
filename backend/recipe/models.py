@@ -47,6 +47,7 @@ class Recipe(models.Model):
     """Модель для рецептов."""
     ingredients = models.ManyToManyField(
         Ingredient,
+        blank=False,
         through='RecipeIngredient',
         related_name='ingredients',
         help_text='Список ингредиентов',
@@ -118,9 +119,17 @@ class ReciepeShopList(models.Model):
 
 class RecipeIngredient(models.Model):
     """Промежуточная модель для ингредиентов в рецепте."""
-    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
-    ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE)
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='ingredients_with_amount')
+    ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE, related_name='ingredients_with_amount')
     amount = models.FloatField(validators=(MinValueValidator(0),))
 
     def __str__(self) -> str:
         return f'{self.ingredient} for {self.recipe}'
+
+    class Meta:
+        constraints = (
+            models.UniqueConstraint(
+                name='unique_recipe_ingredient',
+                fields=('recipe', 'ingredient')
+            ),
+        )

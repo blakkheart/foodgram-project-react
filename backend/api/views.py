@@ -1,7 +1,7 @@
 from io import BytesIO
 
 from django.contrib.auth import get_user_model
-from rest_framework import generics, status, viewsets
+from rest_framework import generics, status, viewsets, serializers
 from django.http import FileResponse
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
@@ -78,15 +78,18 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def shopping_cart(self, request, pk=None):
 
         user = request.user
-        recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
 
         if request.method == 'POST':
+            try:
+                recipe = Recipe.objects.get(pk=self.kwargs.get('pk'))
+            except Recipe.DoesNotExist:
+                raise serializers.ValidationError('Recipe doesnt exist')
             obj, created = ReciepeShopList.objects.get_or_create(
                 user=user,
                 recipe=recipe
             )
             if created:
-                serializer = self.get_serializer(recipe)
+                serializer = ShoppingCartOrFavoriteRecipeSerializer(recipe)
                 return Response(
                     serializer.data,
                     status=status.HTTP_201_CREATED
@@ -97,6 +100,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
             )
 
         if request.method == 'DELETE':
+            recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
+
             try:
                 obj = ReciepeShopList.objects.get(user=user, recipe=recipe)
                 obj.delete()
@@ -112,7 +117,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             detail=False,
             permission_classes=(IsAuthenticated,),
         )
-    def shopping_cart_download(self, request, pk=None):
+    def download_shopping_cart(self, request, pk=None):
 
         if not request.user.is_authenticated:
             return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -151,7 +156,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         buffer.seek(0)
         response = FileResponse(buffer,
                                 as_attachment=True,
-                                filename='shop_cart.pdf')
+                                filename='shop_cart.pdf',
+                                status=status.HTTP_200_OK)
         return response
 
     @action(
@@ -162,15 +168,18 @@ class RecipeViewSet(viewsets.ModelViewSet):
     )
     def favorite(self, request, pk=None):
         user = request.user
-        recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
-
+        
         if request.method == 'POST':
+            try:
+                recipe = Recipe.objects.get(pk=self.kwargs.get('pk'))
+            except Recipe.DoesNotExist:
+                raise serializers.ValidationError('Recipe doent exist')
             obj, created = RecipeFavourite.objects.get_or_create(
                 user=user,
                 recipe=recipe
             )
             if created:
-                serializer = self.get_serializer(recipe)
+                serializer = ShoppingCartOrFavoriteRecipeSerializer(recipe)
                 return Response(
                     serializer.data,
                     status=status.HTTP_201_CREATED
@@ -181,6 +190,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
             )
 
         if request.method == 'DELETE':
+            recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
+
             try:
                 obj = RecipeFavourite.objects.get(user=user, recipe=recipe)
                 obj.delete()
@@ -192,30 +203,49 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 )
 
 
-class UserSubscriptionView(generics.ListAPIView):
-    serializer_class = UserSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly, )
+# class UserSubscriptionView(generics.ListAPIView):
+#     serializer_class = UserSerializer
+#     permission_classes = (IsAuthenticatedOrReadOnly, )
 
+#     def get_queryset(self):
+#         user = self.request.user
+#         return user.followers.all()
+
+
+class SubscribeView(generics.ListAPIView, generics.CreateAPIView, generics.DestroyAPIView):
+    #queryset = User.objects.all()
+    serializer_class = UserSubSerializer
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     def get_queryset(self):
         user = self.request.user
         return user.followers.all()
-
-
-class SubscribeView(generics.CreateAPIView, generics.DestroyAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSubSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
-
-    def perform_destroy(self, instance):
+    
+    def destroy(self, request, *args, **kwargs):
         user = get_object_or_404(User, username=self.request.user.username)
         id_user_to_unfollow = self.kwargs.get('pk')
         user_to_unfollow = get_object_or_404(User, pk=id_user_to_unfollow)
-        model_to_delete = get_object_or_404(
-            UserFollowing,
-            user=user_to_unfollow,
-            following_user=user
-        )
+        try:
+            model_to_delete = UserFollowing.objects.get(
+                user=user_to_unfollow,
+                following_user=user
+            )
+        except UserFollowing.DoesNotExist:
+            raise serializers.ValidationError('you were not subscribed at the first place')
         model_to_delete.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # def perform_destroy(self, instance):
+    #     user = get_object_or_404(User, username=self.request.user.username)
+    #     id_user_to_unfollow = self.kwargs.get('pk')
+    #     user_to_unfollow = get_object_or_404(User, pk=id_user_to_unfollow)
+    #     try:
+    #         model_to_delete = UserFollowing.objects.get(
+    #             user=user_to_unfollow,
+    #             following_user=user
+    #         )
+    #     except UserFollowing.DoesNotExist:
+    #         raise serializers.ValidationError('you were not subscribed at the first place')
+    #     model_to_delete.delete()
 
 
 class DjoserUserCustomView(UVS):

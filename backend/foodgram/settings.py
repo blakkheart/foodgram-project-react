@@ -27,10 +27,10 @@ INSTALLED_APPS = [
     'user.apps.UserConfig',
 
     # 3rd party apps
-    'django_filters',
     'djoser',
     'rest_framework',
     'rest_framework.authtoken',
+    'django_filters',
 ]
 
 MIDDLEWARE = [
@@ -120,12 +120,12 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ],
 
-    'DEFAULT_PAGINATION_CLASS': 'api.paginations.CustomPageNumberPagination',
-    'PAGE_SIZE': 10,
-
     'DEFAULT_FILTER_BACKENDS': (
         'django_filters.rest_framework.DjangoFilterBackend',
-    )
+    ),
+
+    'DEFAULT_PAGINATION_CLASS': 'api.paginations.CustomPageNumberPagination',
+    'PAGE_SIZE': 10,
 
 }
 
@@ -138,7 +138,7 @@ DJOSER = {
     'SERIALIZERS': {
         'user': 'api.serializers.UserSerializer',
         'current_user': 'api.serializers.UserSerializer',
-        'user_create': 'api.serializers.UserCreateSerializer',
+        #'user_create': 'api.serializers.UserCreateSerializer',
     },
-    
+
 }

@@ -5,7 +5,7 @@ from api.views import (
     TagViewSet,
     RecipeViewSet,
     IngredientViewSet,
-    UserSubscriptionView,
+    #UserSubscriptionView,
     SubscribeView,
     DjoserUserCustomView,
 )
@@ -19,7 +19,7 @@ router_v1.register(r'users', DjoserUserCustomView, basename='djoser-user')
 urlpatterns = [
     path(
         'users/subscriptions/',
-        UserSubscriptionView.as_view(),
+        SubscribeView.as_view(),
         name='subscriptions'
     ),
     path(
@@ -28,5 +28,9 @@ urlpatterns = [
         name='subscribe'
     ),
     path('', include(router_v1.urls)),
+    #path('', include('djoser.urls')),
     path('auth/', include('djoser.urls.authtoken')),
 ]
+
+
+###    ПАРОЛЬ НЕ СОХРНАЯЕТСЯ В ЮЗЕРА
