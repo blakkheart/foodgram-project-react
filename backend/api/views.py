@@ -1,41 +1,41 @@
 from io import BytesIO
 
 from django.contrib.auth import get_user_model
-from rest_framework import generics, status, viewsets, serializers
 from django.http import FileResponse
-from reportlab.pdfgen import canvas
+from django.shortcuts import get_object_or_404
+from django_filters import rest_framework as filters
+from djoser.views import UserViewSet as UVS
+from recipe.models import (
+    Ingredient,
+    ReciepeShopList,
+    Recipe,
+    RecipeFavourite,
+    RecipeIngredient,
+    Tag,
+)
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from rest_framework.response import Response
+from reportlab.pdfgen import canvas
+from rest_framework import generics, serializers, status, viewsets
 from rest_framework.decorators import action
-from django.shortcuts import get_object_or_404
-from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated, AllowAny
-from djoser.views import UserViewSet as UVS
-from django_filters import rest_framework as filters
-
-from recipe.models import (
-    Recipe,
-    Tag,
-    Ingredient,
-    RecipeIngredient,
-    ReciepeShopList,
-    RecipeFavourite,
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
 )
-from api.serializers import (
-    TagSerializer,
-    IngredientSerializer,
-    RecipeSerializer,
-    UserSerializer,
-    ShoppingCartOrFavoriteRecipeSerializer,
-    RecipeSerializerPOST,
-    UserSubSerializer,
-)
-
+from rest_framework.response import Response
 from user.models import UserFollowing
 
-from api.permissions import IsAuthor, RecipePermissions
-
-from api.filters import RecipeFilter, IngredientFilter
+from api.filters import IngredientFilter, RecipeFilter
+from api.permissions import RecipePermissions
+from api.serializers import (
+    IngredientSerializer,
+    RecipeSerializer,
+    RecipeSerializerPOST,
+    ShoppingCartOrFavoriteRecipeSerializer,
+    TagSerializer,
+    UserSubSerializer,
+)
 
 User = get_user_model()
 
@@ -59,7 +59,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'delete', 'patch']
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class = RecipeFilter
-    permission_classes = (RecipePermissions, )
+    permission_classes = (RecipePermissions,)
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -70,10 +70,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
         serializer.save(author=self.request.user)
 
     @action(
-            methods=('post', 'delete'),
-            detail=True,
-            serializer_class=ShoppingCartOrFavoriteRecipeSerializer,
-            permission_classes=(IsAuthenticated,),
+        methods=('post', 'delete'),
+        detail=True,
+        serializer_class=ShoppingCartOrFavoriteRecipeSerializer,
+        permission_classes=(IsAuthenticated,),
     )
     def shopping_cart(self, request, pk=None):
 
@@ -85,18 +85,16 @@ class RecipeViewSet(viewsets.ModelViewSet):
             except Recipe.DoesNotExist:
                 raise serializers.ValidationError('Recipe doesnt exist')
             obj, created = ReciepeShopList.objects.get_or_create(
-                user=user,
-                recipe=recipe
+                user=user, recipe=recipe
             )
             if created:
                 serializer = ShoppingCartOrFavoriteRecipeSerializer(recipe)
                 return Response(
-                    serializer.data,
-                    status=status.HTTP_201_CREATED
+                    serializer.data, status=status.HTTP_201_CREATED
                 )
             return Response(
                 {'errors': 'Already exists'},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         if request.method == 'DELETE':
@@ -109,14 +107,12 @@ class RecipeViewSet(viewsets.ModelViewSet):
             except ReciepeShopList.DoesNotExist:
                 return Response(
                     {'errors': 'Does not exist'},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
     @action(
-            methods=('get',),
-            detail=False,
-            permission_classes=(IsAuthenticated,),
-        )
+        methods=('get',), detail=False, permission_classes=(IsAuthenticated,),
+    )
     def download_shopping_cart(self, request, pk=None):
 
         if not request.user.is_authenticated:
@@ -126,7 +122,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         pdf_canvas = canvas.Canvas(buffer)
         pdfmetrics.registerFont(TTFont('Verdana', 'Verdana.ttf'))
         pdf_canvas.setFont('Verdana', 8)
-        pdf_canvas.drawString(100, 750, "Shopping Cart")
+        pdf_canvas.drawString(100, 750, 'Shopping Cart')
 
         current_user = request.user
         user = User.objects.get(username=current_user)
@@ -146,47 +142,45 @@ class RecipeViewSet(viewsets.ModelViewSet):
         y = 700
         for ingredient, value in ingredient_dict.items():
             pdf_canvas.drawString(
-                100,
-                y,
-                f"{ingredient} ({value[1]}) — {value[0]}"
+                100, y, f'{ingredient} ({value[1]}) — {value[0]}'
             )
             y -= 20
         pdf_canvas.showPage()
         pdf_canvas.save()
         buffer.seek(0)
-        response = FileResponse(buffer,
-                                as_attachment=True,
-                                filename='shop_cart.pdf',
-                                status=status.HTTP_200_OK)
+        response = FileResponse(
+            buffer,
+            as_attachment=True,
+            filename='shop_cart.pdf',
+            status=status.HTTP_200_OK,
+        )
         return response
 
     @action(
-            methods=('post', 'delete'),
-            detail=True,
-            serializer_class=ShoppingCartOrFavoriteRecipeSerializer,
-            permission_classes=(IsAuthenticated,),
+        methods=('post', 'delete'),
+        detail=True,
+        serializer_class=ShoppingCartOrFavoriteRecipeSerializer,
+        permission_classes=(IsAuthenticated,),
     )
     def favorite(self, request, pk=None):
         user = request.user
-        
+
         if request.method == 'POST':
             try:
                 recipe = Recipe.objects.get(pk=self.kwargs.get('pk'))
             except Recipe.DoesNotExist:
                 raise serializers.ValidationError('Recipe doent exist')
             obj, created = RecipeFavourite.objects.get_or_create(
-                user=user,
-                recipe=recipe
+                user=user, recipe=recipe
             )
             if created:
                 serializer = ShoppingCartOrFavoriteRecipeSerializer(recipe)
                 return Response(
-                    serializer.data,
-                    status=status.HTTP_201_CREATED
+                    serializer.data, status=status.HTTP_201_CREATED
                 )
             return Response(
                 {'errors': 'Already exists'},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         if request.method == 'DELETE':
@@ -199,57 +193,39 @@ class RecipeViewSet(viewsets.ModelViewSet):
             except RecipeFavourite.DoesNotExist:
                 return Response(
                     {'errors': 'Does not exist'},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
 
-# class UserSubscriptionView(generics.ListAPIView):
-#     serializer_class = UserSerializer
-#     permission_classes = (IsAuthenticatedOrReadOnly, )
-
-#     def get_queryset(self):
-#         user = self.request.user
-#         return user.followers.all()
-
-
-class SubscribeView(generics.ListAPIView, generics.CreateAPIView, generics.DestroyAPIView):
-    #queryset = User.objects.all()
+class SubscribeView(
+    generics.ListAPIView, generics.CreateAPIView, generics.DestroyAPIView
+):
     serializer_class = UserSubSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
+
     def get_queryset(self):
         user = self.request.user
         return user.followers.all()
-    
+
     def destroy(self, request, *args, **kwargs):
         user = get_object_or_404(User, username=self.request.user.username)
         id_user_to_unfollow = self.kwargs.get('pk')
         user_to_unfollow = get_object_or_404(User, pk=id_user_to_unfollow)
         try:
             model_to_delete = UserFollowing.objects.get(
-                user=user_to_unfollow,
-                following_user=user
+                user=user_to_unfollow, following_user=user
             )
         except UserFollowing.DoesNotExist:
-            raise serializers.ValidationError('you were not subscribed at the first place')
+            raise serializers.ValidationError(
+                'you were not subscribed at the first place'
+            )
         model_to_delete.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    # def perform_destroy(self, instance):
-    #     user = get_object_or_404(User, username=self.request.user.username)
-    #     id_user_to_unfollow = self.kwargs.get('pk')
-    #     user_to_unfollow = get_object_or_404(User, pk=id_user_to_unfollow)
-    #     try:
-    #         model_to_delete = UserFollowing.objects.get(
-    #             user=user_to_unfollow,
-    #             following_user=user
-    #         )
-    #     except UserFollowing.DoesNotExist:
-    #         raise serializers.ValidationError('you were not subscribed at the first place')
-    #     model_to_delete.delete()
-
 
 class DjoserUserCustomView(UVS):
-    '''Переопределяем джосеровский вьюсет, ограничевая едпоинты и методы.'''
+    """Переопределяем джосеровский вьюсет, ограничевая едпоинты и методы."""
+
     http_method_names = ['get', 'post']
 
     @action(methods=['GET'], detail=False)

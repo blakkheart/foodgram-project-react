@@ -1,11 +1,10 @@
 import base64
 
 from django.contrib.auth import get_user_model
-from rest_framework import serializers, status
 from django.core.files.base import ContentFile
 from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import get_object_or_404
-from rest_framework.response import Response
+from rest_framework import serializers
 
 from recipe.models import (
     Recipe,
@@ -36,7 +35,6 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 class IngredientSerializer(serializers.ModelSerializer):
-    #id = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
         model = Ingredient
         fields = ('id', 'name', 'measurement_unit')
@@ -46,7 +44,10 @@ class IngredientSerializer(serializers.ModelSerializer):
 class IngredientRecipeSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source='ingredient.id')
     name = serializers.CharField(source='ingredient.name')
-    measurement_unit = serializers.CharField(source='ingredient.measurement_unit')
+    measurement_unit = serializers.CharField(
+        source='ingredient.measurement_unit'
+    )
+
     class Meta:
         model = RecipeIngredient
         fields = (
@@ -55,19 +56,6 @@ class IngredientRecipeSerializer(serializers.ModelSerializer):
             'measurement_unit',
             'amount',
         )
-
-    # def get_amount(self, obj):
-    #     qset = (
-    #         RecipeIngredient.
-    #         objects.
-    #         select_related('recipe', 'ingredient').
-    #         filter(ingredient=obj)
-    #     )
-    #     print(qset)
-    #     for object in qset:
-    #         return object.amount
-        
-    
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -81,7 +69,7 @@ class UserSerializer(serializers.ModelSerializer):
             'username',
             'first_name',
             'last_name',
-            'is_subscribed'
+            'is_subscribed',
         )
 
     def get_is_subscribed(self, obj):
@@ -96,7 +84,6 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = User
         fields = (
@@ -107,15 +94,15 @@ class UserCreateSerializer(serializers.ModelSerializer):
             'last_name',
             'password',
         )
-        write_only_fields = (
-            'password'
-        )
+        write_only_fields = 'password'
 
 
 class RecipeSerializer(serializers.ModelSerializer):
     image = Base64ImageField()
     tags = TagSerializer(many=True,)
-    ingredients = IngredientRecipeSerializer(many=True, source='ingredients_with_amount')
+    ingredients = IngredientRecipeSerializer(
+        many=True, source='ingredients_with_amount'
+    )
     author = UserSerializer(read_only=True)
     is_favorited = serializers.SerializerMethodField()
     is_in_shopping_cart = serializers.SerializerMethodField()
@@ -162,16 +149,10 @@ class ShoppingCartOrFavoriteRecipeSerializer(serializers.ModelSerializer):
 
 class IngredientSerializePOST(serializers.ModelSerializer):
     id = serializers.IntegerField()
-    #amount = serializers.FloatField(source='amount')
 
     class Meta:
         model = RecipeIngredient
         fields = ('id', 'amount')
-
-    # def validate(self, data):
-    #     if data.get('amount') < 1:
-    #         raise serializers.ValidationError('Amount cant be less than 1')
-    #     return data
 
 
 class RecipeSerializerPOST(serializers.ModelSerializer):
@@ -209,19 +190,19 @@ class RecipeSerializerPOST(serializers.ModelSerializer):
             amount = ingredient.get('amount')
             if amount < 1:
                 raise serializers.ValidationError('Amount cant be less then 1')
-            
-            obj, created =RecipeIngredient.objects.get_or_create(
-                ingredient=ing,
-                recipe=recipe,
-                amount=amount
+
+            obj, created = RecipeIngredient.objects.get_or_create(
+                ingredient=ing, recipe=recipe, amount=amount
             )
             if not created:
-                raise serializers.ValidationError('Ingredients should not be dubbled')
+                raise serializers.ValidationError(
+                    'Ingredients should not be dubbled'
+                )
 
         return recipe
 
     def create_or_update_ingredients(self, ingredients, recipe_id):
-        
+
         if not ingredients:
             raise serializers.ValidationError('Ingredients cant be empty')
 
@@ -233,19 +214,21 @@ class RecipeSerializerPOST(serializers.ModelSerializer):
             except Ingredient.DoesNotExist:
                 raise serializers.ValidationError('ingredient doesnt exist')
             if ingredient.get('id') in ingr_set:
-                raise serializers.ValidationError('ingredients cannot be dubbled')
+                raise serializers.ValidationError(
+                    'ingredients cannot be dubbled'
+                )
             ingr_set.add(ingredient.get('id'))
             amount = ingredient.get('amount')
             if amount < 1:
                 raise serializers.ValidationError('Amount cant be less then 1')
-            ingredient_instance, created = (
-                RecipeIngredient.
-                objects.
-                update_or_create(
-                    ingredient=ing,
-                    recipe=Recipe.objects.get(id=recipe_id),
-                    amount=amount,
-                    defaults=ingredient)
+            (
+                ingredient_instance,
+                created,
+            ) = RecipeIngredient.objects.update_or_create(
+                ingredient=ing,
+                recipe=Recipe.objects.get(id=recipe_id),
+                amount=amount,
+                defaults=ingredient,
             )
             ingr_ids.append(ingredient_instance.pk)
         return ingr_ids
@@ -261,13 +244,12 @@ class RecipeSerializerPOST(serializers.ModelSerializer):
         instance.name = validated_data.get('name', instance.name)
         instance.text = validated_data.get('text', instance.text)
         instance.cooking_time = validated_data.get(
-            'cooking_time',
-            instance.cooking_time
+            'cooking_time', instance.cooking_time
         )
         instance.image = validated_data.get('image', instance.image)
         instance.ingredients.set(
-            self.create_or_update_ingredients(ingredients_data, recipe_id))
-        
+            self.create_or_update_ingredients(ingredients_data, recipe_id)
+        )
         instance.tags.set(tags)
         instance.save()
         return instance
@@ -296,7 +278,6 @@ class UserSubSerializer(serializers.ModelSerializer):
             'is_subscribed',
             'recipes',
             'recipes_count',
-
         )
         read_only_fields = (
             'email',
@@ -321,7 +302,11 @@ class UserSubSerializer(serializers.ModelSerializer):
 
     def get_recipes(self, obj):
         user = get_object_or_404(User, pk=obj.pk)
-        recipes = user.recipies.all()
+        recipes_limit = self.context.get('request').GET.get('recipes_limit')
+        if recipes_limit:
+            recipes = user.recipies.all()[: int(recipes_limit)]
+        else:
+            recipes = user.recipies.all()
         return ShoppingCartOrFavoriteRecipeSerializer(recipes, many=True).data
 
     def get_recipes_count(self, obj):
@@ -333,12 +318,13 @@ class UserSubSerializer(serializers.ModelSerializer):
         id_user_to_follow = self.context.get('view').kwargs.get('pk')
         user_to_follow = get_object_or_404(User, pk=id_user_to_follow)
         user = get_object_or_404(
-            User,
-            username=self.context.get('request').user.username
+            User, username=self.context.get('request').user.username
         )
         if user == user_to_follow:
             raise serializers.ValidationError('Cannot subscribe to yourself')
-        obj, created = UserFollowing.objects.get_or_create(user=user_to_follow, following_user=user)
+        obj, created = UserFollowing.objects.get_or_create(
+            user=user_to_follow, following_user=user
+        )
         if not created:
             raise serializers.ValidationError('Cannot subscribe twice')
         return user_to_follow

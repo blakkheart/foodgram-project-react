@@ -2,12 +2,12 @@ from django.contrib import admin
 from django.db.models import Sum
 
 from recipe.models import (
-    Tag,
     Ingredient,
-    Recipe,
     ReciepeShopList,
+    Recipe,
     RecipeFavourite,
     RecipeIngredient,
+    Tag,
 )
 
 
@@ -33,7 +33,7 @@ class RecipeAdmin(admin.ModelAdmin):
         'author',
         'cooking_time',
         'pub_date',
-        'num_of_favourites'
+        'num_of_favourites',
     )
     fields = [
         ('name', 'cooking_time'),
@@ -50,13 +50,14 @@ class RecipeAdmin(admin.ModelAdmin):
         'tags',
     )
     search_fields = (
-        'name', 'tags',
+        'name',
+        'tags',
     )
     list_per_page = 25
     inlines = (
         RecipeIngredientInline,
         RecipeFavouriteInline,
-        ReciepeShopListInline
+        ReciepeShopListInline,
     )
     list_select_related = ('author',)
 
@@ -70,24 +71,14 @@ class RecipeAdmin(admin.ModelAdmin):
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
-    list_display = (
-        'name',
-    )
-    search_fields = (
-        'name',
-    )
+    list_display = ('name',)
+    search_fields = ('name',)
     list_per_page = 25
 
 
 @admin.register(Ingredient)
 class IngredientAdmin(admin.ModelAdmin):
-    list_display = (
-        'name', 'measurement_unit'
-    )
-    search_fields = (
-        'name',
-    )
-    list_filter = (
-        'measurement_unit',
-    )
+    list_display = ('name', 'measurement_unit')
+    search_fields = ('name',)
+    list_filter = ('measurement_unit',)
     list_per_page = 25

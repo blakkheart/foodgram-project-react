@@ -1,12 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from recipe.models import ReciepeShopList, RecipeFavourite
 
-from recipe.models import (
-    ReciepeShopList, RecipeFavourite
-)
-from user.models import (
-    UserFollowing
-)
+from user.models import UserFollowing
 
 User = get_user_model()
 
@@ -36,13 +32,12 @@ class UserAdmin(admin.ModelAdmin):
         'last_name',
         'num_of_followers',
     )
-    list_filter = (
-        'email', 'first_name'
-    )
+    list_filter = ('email', 'first_name')
     search_fields = (
-        'email', 'first_name',
+        'email',
+        'first_name',
     )
-    add_fieldsets = ("Extra", {'fields': ("num_of_followers")})
+    add_fieldsets = ('Extra', {'fields': ('num_of_followers')})
     readonly_fields = ('num_of_followers',)
     list_per_page = 25
     inlines = (

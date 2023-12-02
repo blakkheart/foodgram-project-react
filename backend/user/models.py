@@ -5,7 +5,7 @@ from django.db import models
 
 class User(AbstractUser):
     """Кастомная модель юзера."""
-    # менеджер сделать для создания юзера ?
+
     username = models.CharField(
         max_length=150,
         unique=True,
@@ -20,16 +20,16 @@ class User(AbstractUser):
         through='UserFollowing',
         symmetrical=False,
         blank=True,
-        related_name='followers'
+        related_name='followers',
     )
     favourite = models.ManyToManyField(
-        "recipe.Recipe",
+        'recipe.Recipe',
         through='recipe.RecipeFavourite',
         blank=True,
         related_name='favourites',
     )
     shop_list = models.ManyToManyField(
-        "recipe.Recipe",
+        'recipe.Recipe',
         through='recipe.ReciepeShopList',
         blank=True,
         related_name='shop_list',
@@ -38,7 +38,7 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
 
     class Meta:
-        ordering = ('id', )
+        ordering = ('id',)
 
     def __str__(self) -> str:
         return self.username
@@ -46,11 +46,10 @@ class User(AbstractUser):
 
 class UserFollowing(models.Model):
     """Модель для подписок юзера."""
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     following_user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='followed'
+        User, on_delete=models.CASCADE, related_name='followed'
     )
     created = models.DateTimeField(auto_now_add=True, db_index=True)
 
@@ -60,7 +59,6 @@ class UserFollowing(models.Model):
     class Meta:
         constraints = (
             models.UniqueConstraint(
-                name='unique_follow',
-                fields=('user', 'following_user')
+                name='unique_follow', fields=('user', 'following_user')
             ),
         )

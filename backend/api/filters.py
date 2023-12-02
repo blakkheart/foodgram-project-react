@@ -1,22 +1,24 @@
-from django_filters import rest_framework as filters
 from django.contrib.auth import get_user_model
+from django_filters import rest_framework as filters
 
-from recipe.models import (
-    Recipe,
-    RecipeFavourite,
-    ReciepeShopList,
-    Ingredient
-)
+from recipe.models import Recipe, RecipeFavourite, ReciepeShopList, Ingredient
 
 
 User = get_user_model()
 
 
 class RecipeFilter(filters.FilterSet):
+    '''Фильтр для Рецептов.'''
 
-    is_favorited = filters.BooleanFilter(method='favorites', field_name='is_favorited')
-    is_in_shopping_cart = filters.BooleanFilter(method='shop_cart', field_name='is_in_shopping_cart')
-    author = filters.NumberFilter(field_name='author__id', lookup_expr='iexact')
+    is_favorited = filters.BooleanFilter(
+        method='favorites', field_name='is_favorited'
+    )
+    is_in_shopping_cart = filters.BooleanFilter(
+        method='shop_cart', field_name='is_in_shopping_cart'
+    )
+    author = filters.NumberFilter(
+        field_name='author__id', lookup_expr='iexact'
+    )
     tags = filters.CharFilter(field_name='tags__slug', lookup_expr='iexact')
 
     class Meta:
@@ -59,6 +61,4 @@ class IngredientFilter(filters.FilterSet):
 
     class Meta:
         model = Ingredient
-        fields = (
-            'name',
-        )
+        fields = ('name',)
