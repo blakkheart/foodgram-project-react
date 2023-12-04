@@ -13,13 +13,14 @@ from recipe.models import (
     Ingredient,
     RecipeIngredient,
 )
-
 from user.models import UserFollowing
 
 User = get_user_model()
 
 
 class Base64ImageField(serializers.ImageField):
+    '''Сериализатор для изображений.'''
+
     def to_internal_value(self, data):
         if isinstance(data, str) and data.startswith('data:image'):
             format, imgstr = data.split(';base64,')
@@ -29,6 +30,7 @@ class Base64ImageField(serializers.ImageField):
 
 
 class TagSerializer(serializers.ModelSerializer):
+    '''Сериализитор для тегов.'''
     class Meta:
         model = Tag
         fields = ('id', 'name', 'color', 'slug')
@@ -36,6 +38,7 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 class IngredientSerializer(serializers.ModelSerializer):
+    '''Сериализитор для ингредиентов.'''
     class Meta:
         model = Ingredient
         fields = ('id', 'name', 'measurement_unit')
@@ -43,6 +46,7 @@ class IngredientSerializer(serializers.ModelSerializer):
 
 
 class IngredientRecipeSerializer(serializers.ModelSerializer):
+    '''Сериализитор для ингредиентов в рецепте.'''
     id = serializers.IntegerField(source='ingredient.id')
     name = serializers.CharField(source='ingredient.name')
     measurement_unit = serializers.CharField(
@@ -60,6 +64,7 @@ class IngredientRecipeSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    '''Сериализитор для юзера.'''
     is_subscribed = serializers.SerializerMethodField()
 
     class Meta:
@@ -85,6 +90,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class RecipeSerializer(serializers.ModelSerializer):
+    '''Сериализитор для рецептов для показа.'''
     image = Base64ImageField()
     tags = TagSerializer(many=True,)
     ingredients = IngredientRecipeSerializer(
@@ -128,6 +134,7 @@ class RecipeSerializer(serializers.ModelSerializer):
 
 
 class ShoppingCartOrFavoriteRecipeSerializer(serializers.ModelSerializer):
+    '''Сериализитор для показа "коротких" рецептов.'''
     class Meta:
         model = Recipe
         fields = ('id', 'name', 'image', 'cooking_time')
@@ -135,6 +142,7 @@ class ShoppingCartOrFavoriteRecipeSerializer(serializers.ModelSerializer):
 
 
 class IngredientSerializePOST(serializers.ModelSerializer):
+    '''Сериализитор для ингредиентов на запись.'''
     id = serializers.IntegerField()
 
     class Meta:
@@ -143,6 +151,7 @@ class IngredientSerializePOST(serializers.ModelSerializer):
 
 
 class RecipeSerializerPOST(serializers.ModelSerializer):
+    '''Сериализитор для рецептов на запись.'''
     image = Base64ImageField()
     ingredients = IngredientSerializePOST(many=True, required=True)
     author = UserSerializer(read_only=True)
@@ -193,7 +202,6 @@ class RecipeSerializerPOST(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     'Ingredients should not be dubbled'
                 )
-
         return recipe
 
     def create_or_update_ingredients(self, ingredients, recipe_id):
@@ -251,6 +259,7 @@ class RecipeSerializerPOST(serializers.ModelSerializer):
 
 
 class UserSubSerializer(serializers.ModelSerializer):
+    '''Сериализитор для подписок пользователя.'''
     is_subscribed = serializers.SerializerMethodField()
     recipes_count = serializers.SerializerMethodField()
     recipes = serializers.SerializerMethodField()

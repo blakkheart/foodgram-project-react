@@ -8,7 +8,7 @@ User = get_user_model()
 
 
 class RecipeFilter(filters.FilterSet):
-    '''Фильтр для Рецептов.'''
+    '''Фильтр для рецептов.'''
 
     is_favorited = filters.BooleanFilter(
         method='favorites', field_name='is_favorited'
@@ -56,6 +56,7 @@ class RecipeFilter(filters.FilterSet):
 
 
 class IngredientFilter(filters.FilterSet):
+    '''Фильтр для ингредиентов.'''
 
     name = filters.CharFilter(field_name='name', lookup_expr='startswith')
 

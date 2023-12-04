@@ -1,1 +1,3 @@
-[{"username": "Завтрак", "email": "#E26C2D", "password": "breakfast", "first_name": "breakfast", "last_name": "breakfast", "follower": "breakfast", "favourite": "breakfast", "shop_list": "breakfast"}]
+[{"username": "ivan", "email": "ivan@mail.ru", "password": "Ivan10102010", "first_name": "Ivan", "last_name": "Ivanov"},
+{"username": "petr", "email": "petr@mail.ru", "password": "Petr10102010", "first_name": "Petr", "last_name": "Petrovich"},
+{"username": "sasha", "email": "sasha@mail.ru", "password": "Sasha10102010", "first_name": "Sasha", "last_name": "Avdi"}]

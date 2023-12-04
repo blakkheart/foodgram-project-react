@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 
 
 class DjoserUserCustomView(UVS):
-    """Переопределяем джосеровский вьюсет, ограничевая едпоинты и методы."""
+    """Переопределяем джосеровский вьюсет, ограничевая ендпоинты и методы."""
 
     http_method_names = ['get', 'post']
 

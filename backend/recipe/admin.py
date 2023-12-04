@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.db.models import Sum
 
 from recipe.models import (
     Ingredient,

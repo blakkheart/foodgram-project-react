@@ -1,28 +1,13 @@
-
-
 from django.contrib.auth import get_user_model
-
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
-
-from recipe.models import (
-    Ingredient,
-    ReciepeShopList,
-    Recipe,
-    RecipeFavourite,
-    RecipeIngredient,
-    Tag,
-)
-
 from rest_framework import generics, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import (
-
     IsAuthenticated,
     IsAuthenticatedOrReadOnly,
 )
 from rest_framework.response import Response
-from user.models import UserFollowing
 
 from api.filters import IngredientFilter, RecipeFilter
 from api.permissions import RecipePermissions
@@ -35,17 +20,29 @@ from api.serializers import (
     UserSubSerializer,
 )
 from api.utils import generate_pdf_file_response
+from recipe.models import (
+    Ingredient,
+    ReciepeShopList,
+    Recipe,
+    RecipeFavourite,
+    RecipeIngredient,
+    Tag,
+)
+from user.models import UserFollowing
+
 
 User = get_user_model()
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
+    '''Вьюсет для тэгов.'''
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     pagination_class = None
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
+    '''Вьюсет для ингредиентов.'''
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     pagination_class = None
@@ -54,6 +51,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
+    '''Вьюсет для рецептов.'''
     queryset = Recipe.objects.prefetch_related('ingredients', 'tags').all()
     http_method_names = ['get', 'post', 'delete', 'patch']
     filter_backends = (filters.DjangoFilterBackend,)
@@ -97,7 +95,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         if request.method == 'DELETE':
             recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
-
             try:
                 obj = ReciepeShopList.objects.get(user=user, recipe=recipe)
                 obj.delete()
@@ -112,10 +109,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         methods=('get',), detail=False, permission_classes=(IsAuthenticated,),
     )
     def download_shopping_cart(self, request, pk=None):
-
         if not request.user.is_authenticated:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-
         current_user = request.user
         user = User.objects.get(username=current_user)
         objects = user.shop_list.select_related('author').all()
@@ -130,7 +125,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
                     ingredient_dict[name][0] += amount
                 else:
                     ingredient_dict[name] = [amount, units]
-
         return generate_pdf_file_response(items=ingredient_dict)
 
     @action(
@@ -141,7 +135,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
     )
     def favorite(self, request, pk=None):
         user = request.user
-
         if request.method == 'POST':
             try:
                 recipe = Recipe.objects.get(pk=self.kwargs.get('pk'))
@@ -162,7 +155,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         if request.method == 'DELETE':
             recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
-
             try:
                 obj = RecipeFavourite.objects.get(user=user, recipe=recipe)
                 obj.delete()
@@ -177,6 +169,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
 class SubscribeView(
     generics.ListAPIView, generics.CreateAPIView, generics.DestroyAPIView
 ):
+    '''Вьюсет для подписок.'''
     serializer_class = UserSubSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
 

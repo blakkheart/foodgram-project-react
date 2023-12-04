@@ -8,14 +8,14 @@ from rest_framework import status
 
 
 def generate_pdf_file_response(items: dict[str, list]) -> FileResponse:
-
+    '''Функция для генерации пдф.'''
     buffer = BytesIO()
     pdf_canvas = canvas.Canvas(buffer)
     pdfmetrics.registerFont(TTFont('Verdana', 'Verdana.ttf'))
     pdf_canvas.setFont('Verdana', 11)
     pdf_canvas.drawString(250, 750, 'Shopping Cart')
     pdf_canvas.setFont('Verdana', 9)
-    pdf_canvas.drawString(0, 720, '—'*80)
+    pdf_canvas.drawString(0, 720, '—' * 80)
     page_number = 1
     y = 700
     for name, value in items.items():
@@ -34,7 +34,7 @@ def generate_pdf_file_response(items: dict[str, list]) -> FileResponse:
             y = 750
     pdf_canvas.setFont('Verdana', 11)
     pdf_canvas.drawString(
-        250, y-40, 'Happy shopping!')
+        250, y - 40, 'Happy shopping!')
     pdf_canvas.setFont('Verdana', 9)
     pdf_canvas.drawString(
         480, 10, 'Produced by Foodgram')
