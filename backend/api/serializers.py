@@ -3,6 +3,7 @@ import base64
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 
@@ -81,20 +82,6 @@ class UserSerializer(serializers.ModelSerializer):
             return True
         except ObjectDoesNotExist:
             return False
-
-
-class UserCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = (
-            'email',
-            'id',
-            'username',
-            'first_name',
-            'last_name',
-            'password',
-        )
-        write_only_fields = 'password'
 
 
 class RecipeSerializer(serializers.ModelSerializer):
@@ -186,15 +173,23 @@ class RecipeSerializerPOST(serializers.ModelSerializer):
             try:
                 ing = Ingredient.objects.get(pk=ingredient.get('id'))
             except Ingredient.DoesNotExist:
+                recipe.delete()
                 raise serializers.ValidationError('Ingredient doesnt exist')
             amount = ingredient.get('amount')
             if amount < 1:
+                recipe.delete()
                 raise serializers.ValidationError('Amount cant be less then 1')
-
-            obj, created = RecipeIngredient.objects.get_or_create(
-                ingredient=ing, recipe=recipe, amount=amount
-            )
+            try:
+                obj, created = RecipeIngredient.objects.get_or_create(
+                    ingredient=ing, recipe=recipe, amount=amount
+                )
+            except IntegrityError:
+                recipe.delete()
+                raise serializers.ValidationError(
+                    'Ingredients should not be dubbled'
+                )
             if not created:
+                recipe.delete()
                 raise serializers.ValidationError(
                     'Ingredients should not be dubbled'
                 )
@@ -206,7 +201,6 @@ class RecipeSerializerPOST(serializers.ModelSerializer):
         if not ingredients:
             raise serializers.ValidationError('Ingredients cant be empty')
 
-        ingr_ids = []
         ingr_set = set()
         for ingredient in ingredients:
             try:
@@ -221,17 +215,12 @@ class RecipeSerializerPOST(serializers.ModelSerializer):
             amount = ingredient.get('amount')
             if amount < 1:
                 raise serializers.ValidationError('Amount cant be less then 1')
-            (
-                ingredient_instance,
-                created,
-            ) = RecipeIngredient.objects.update_or_create(
+            RecipeIngredient.objects.create(
                 ingredient=ing,
                 recipe=Recipe.objects.get(id=recipe_id),
                 amount=amount,
-                defaults=ingredient,
             )
-            ingr_ids.append(ingredient_instance.pk)
-        return ingr_ids
+        return
 
     def update(self, instance, validated_data):
         ingredients_data = validated_data.pop('ingredients', [])
@@ -247,9 +236,8 @@ class RecipeSerializerPOST(serializers.ModelSerializer):
             'cooking_time', instance.cooking_time
         )
         instance.image = validated_data.get('image', instance.image)
-        instance.ingredients.set(
-            self.create_or_update_ingredients(ingredients_data, recipe_id)
-        )
+        RecipeIngredient.objects.filter(recipe=instance).delete()
+        self.create_or_update_ingredients(ingredients_data, recipe_id)
         instance.tags.set(tags)
         instance.save()
         return instance
@@ -303,10 +291,14 @@ class UserSubSerializer(serializers.ModelSerializer):
     def get_recipes(self, obj):
         user = get_object_or_404(User, pk=obj.pk)
         recipes_limit = self.context.get('request').GET.get('recipes_limit')
+        all_recipes = user.recipies.all()
         if recipes_limit:
-            recipes = user.recipies.all()[: int(recipes_limit)]
+            recipes_limit = int(recipes_limit)
+            if recipes_limit > all_recipes.count():
+                recipes_limit = all_recipes.count()
+            recipes = all_recipes[: recipes_limit]
         else:
-            recipes = user.recipies.all()
+            recipes = all_recipes
         return ShoppingCartOrFavoriteRecipeSerializer(recipes, many=True).data
 
     def get_recipes_count(self, obj):

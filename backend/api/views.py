@@ -1,10 +1,10 @@
-from io import BytesIO
+
 
 from django.contrib.auth import get_user_model
-from django.http import FileResponse
+
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
-from djoser.views import UserViewSet as UVS
+
 from recipe.models import (
     Ingredient,
     ReciepeShopList,
@@ -13,13 +13,11 @@ from recipe.models import (
     RecipeIngredient,
     Tag,
 )
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfgen import canvas
+
 from rest_framework import generics, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import (
-    AllowAny,
+
     IsAuthenticated,
     IsAuthenticatedOrReadOnly,
 )
@@ -36,6 +34,7 @@ from api.serializers import (
     TagSerializer,
     UserSubSerializer,
 )
+from api.utils import generate_pdf_file_response
 
 User = get_user_model()
 
@@ -76,7 +75,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=(IsAuthenticated,),
     )
     def shopping_cart(self, request, pk=None):
-
         user = request.user
 
         if request.method == 'POST':
@@ -118,12 +116,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if not request.user.is_authenticated:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        buffer = BytesIO()
-        pdf_canvas = canvas.Canvas(buffer)
-        pdfmetrics.registerFont(TTFont('Verdana', 'Verdana.ttf'))
-        pdf_canvas.setFont('Verdana', 8)
-        pdf_canvas.drawString(100, 750, 'Shopping Cart')
-
         current_user = request.user
         user = User.objects.get(username=current_user)
         objects = user.shop_list.select_related('author').all()
@@ -139,22 +131,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 else:
                     ingredient_dict[name] = [amount, units]
 
-        y = 700
-        for ingredient, value in ingredient_dict.items():
-            pdf_canvas.drawString(
-                100, y, f'{ingredient} ({value[1]}) — {value[0]}'
-            )
-            y -= 20
-        pdf_canvas.showPage()
-        pdf_canvas.save()
-        buffer.seek(0)
-        response = FileResponse(
-            buffer,
-            as_attachment=True,
-            filename='shop_cart.pdf',
-            status=status.HTTP_200_OK,
-        )
-        return response
+        return generate_pdf_file_response(items=ingredient_dict)
 
     @action(
         methods=('post', 'delete'),
@@ -221,45 +198,3 @@ class SubscribeView(
             )
         model_to_delete.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class DjoserUserCustomView(UVS):
-    """Переопределяем джосеровский вьюсет, ограничевая едпоинты и методы."""
-
-    http_method_names = ['get', 'post']
-
-    @action(methods=['GET'], detail=False)
-    def me(self, request, *args, **kwargs):
-        return super().me(request, *args, **kwargs)
-
-    @action(methods=[''], detail=False)
-    def activation(self, request, *args, **kwargs):
-        return super().activation(request, *args, **kwargs)
-
-    @action(methods=[''], detail=False)
-    def resend_activation(self, request, *args, **kwargs):
-        return super().resend_activation(request, *args, **kwargs)
-
-    @action(methods=['POST'], detail=False)
-    def set_password(self, request, *args, **kwargs):
-        return super().set_password(request, *args, **kwargs)
-
-    @action(methods=[''], detail=False)
-    def reset_password(self, request, *args, **kwargs):
-        return super().reset_password(request, *args, **kwargs)
-
-    @action(methods=[''], detail=False)
-    def reset_password_confirm(self, request, *args, **kwargs):
-        return super().reset_password_confirm(request, *args, **kwargs)
-
-    @action(methods=[''], detail=False)
-    def set_username(self, request, *args, **kwargs):
-        return super().set_username(request, *args, **kwargs)
-
-    @action(methods=[''], detail=False)
-    def reset_username(self, request, *args, **kwargs):
-        return super().reset_username(request, *args, **kwargs)
-
-    @action(methods=[''], detail=False)
-    def reset_username_confirm(self, request, *args, **kwargs):
-        return super().reset_username_confirm(request, *args, **kwargs)
