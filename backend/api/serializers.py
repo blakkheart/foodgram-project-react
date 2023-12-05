@@ -312,8 +312,7 @@ class UserSubSerializer(UserMixinSerializer):
 
     def get_recipes_count(self, obj):
         user = get_object_or_404(User, pk=obj.pk)
-        counter = user.recipies.count()
-        return counter
+        return user.recipies.count()
 
     def create(self, validated_data):
         id_user_to_follow = self.context.get('view').kwargs.get('pk')

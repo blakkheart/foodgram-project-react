@@ -38,10 +38,9 @@ def generate_pdf_file_response(items: dict[str, list]) -> FileResponse:
     pdf_canvas.showPage()
     pdf_canvas.save()
     buffer.seek(0)
-    response = FileResponse(
+    return FileResponse(
         buffer,
         as_attachment=True,
         filename='shopping_cart.pdf',
         status=status.HTTP_200_OK,
     )
-    return response

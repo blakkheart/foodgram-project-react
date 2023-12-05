@@ -2,7 +2,7 @@ from rest_framework import permissions
 
 
 class DjoserMePermission(permissions.BasePermission):
-    '''Кастомный пермишен для просмотра эндопинта пользователей.'''
+    """Кастомный пермишен для просмотра эндопинта пользователей."""
 
     def has_permission(self, request, view):
         if (
@@ -14,7 +14,7 @@ class DjoserMePermission(permissions.BasePermission):
 
 
 class RecipePermissions(permissions.BasePermission):
-    '''Пермишен для рецептов'''
+    """Пермишен для рецептов."""
 
     def has_permission(self, request, view):
         if request.method == 'POST':

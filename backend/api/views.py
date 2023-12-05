@@ -88,7 +88,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
     )
     def shopping_cart(self, request, pk=None):
         user = request.user
-
         if request.method == 'POST':
             try:
                 recipe = Recipe.objects.select_related('author').get(
@@ -108,7 +107,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 {'errors': 'Already exists'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         if request.method == 'DELETE':
             recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
             try:
@@ -120,6 +118,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
                     {'errors': 'Does not exist'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+        return Response({'errors': 'This method is not allowed'})
 
     @action(
         methods=('get',), detail=False, permission_classes=(IsAuthenticated,),
@@ -182,6 +181,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
                     {'errors': 'Does not exist'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+        return Response({'errors': 'This method is not allowed'})
 
 
 class SubscribeView(
