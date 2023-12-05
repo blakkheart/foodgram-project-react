@@ -63,7 +63,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'foodgram.wsgi.application'
 
-DB_NAME = 'sqlite3'
+DB_NAME = 'postgresql'
 
 if DB_NAME == 'postgresql':
 
@@ -120,7 +120,9 @@ STATIC_ROOT = BASE_DIR / 'collected_static'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-DB_DATA_DIR = BASE_DIR / '..' / 'data'
+DB_DATA_DIR = BASE_DIR / 'data'
+
+FONTS_DIR = BASE_DIR / 'media' / 'fonts'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

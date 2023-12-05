@@ -1,8 +1,8 @@
-from djoser.views import UserViewSet as UVS
+from djoser.views import UserViewSet
 from rest_framework.decorators import action
 
 
-class DjoserUserCustomView(UVS):
+class DjoserUserCustomView(UserViewSet):
     """Переопределяем джосеровский вьюсет, ограничевая ендпоинты и методы."""
 
     http_method_names = ['get', 'post']

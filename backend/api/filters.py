@@ -1,14 +1,13 @@
 from django.contrib.auth import get_user_model
 from django_filters import rest_framework as filters
 
-from recipe.models import Recipe, RecipeFavourite, ReciepeShopList, Ingredient
-
+from recipe.models import Ingredient, ReciepeShopList, Recipe, RecipeFavourite
 
 User = get_user_model()
 
 
 class RecipeFilter(filters.FilterSet):
-    '''Фильтр для рецептов.'''
+    """Фильтр для рецептов."""
 
     is_favorited = filters.BooleanFilter(
         method='favorites', field_name='is_favorited'
@@ -56,7 +55,7 @@ class RecipeFilter(filters.FilterSet):
 
 
 class IngredientFilter(filters.FilterSet):
-    '''Фильтр для ингредиентов.'''
+    """Фильтр для ингредиентов."""
 
     name = filters.CharFilter(field_name='name', lookup_expr='startswith')
 

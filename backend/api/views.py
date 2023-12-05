@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
 from rest_framework import generics, serializers, status, viewsets
@@ -15,7 +16,7 @@ from api.serializers import (
     IngredientSerializer,
     RecipeSerializer,
     RecipeSerializerPOST,
-    ShoppingCartOrFavoriteRecipeSerializer,
+    ShortRecipeSerializer,
     TagSerializer,
     UserSubSerializer,
 )
@@ -35,14 +36,16 @@ User = get_user_model()
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
-    '''Вьюсет для тэгов.'''
+    """Вьюсет для тэгов."""
+
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     pagination_class = None
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
-    '''Вьюсет для ингредиентов.'''
+    """Вьюсет для ингредиентов."""
+
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     pagination_class = None
@@ -51,15 +54,26 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
-    '''Вьюсет для рецептов.'''
-    queryset = Recipe.objects.prefetch_related('ingredients', 'tags').all()
+    """Вьюсет для рецептов."""
+
     http_method_names = ['get', 'post', 'delete', 'patch']
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class = RecipeFilter
     permission_classes = (RecipePermissions,)
 
+    def get_queryset(self):
+        qrs = Recipe.objects.prefetch_related(
+            Prefetch(
+                'ingredients',
+                queryset=RecipeIngredient.objects.select_related('ingredient'),
+            ),
+            'tags',
+        ).select_related('author')
+        print(qrs)
+        return qrs
+
     def get_serializer_class(self):
-        if self.action == 'list':
+        if self.action == 'list' or self.action == 'retrive':
             return RecipeSerializer
         return RecipeSerializerPOST
 
@@ -69,22 +83,23 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @action(
         methods=('post', 'delete'),
         detail=True,
-        serializer_class=ShoppingCartOrFavoriteRecipeSerializer,
+        serializer_class=ShortRecipeSerializer,
         permission_classes=(IsAuthenticated,),
     )
     def shopping_cart(self, request, pk=None):
         user = request.user
-
         if request.method == 'POST':
             try:
-                recipe = Recipe.objects.get(pk=self.kwargs.get('pk'))
+                recipe = Recipe.objects.select_related('author').get(
+                    pk=self.kwargs.get('pk')
+                )
             except Recipe.DoesNotExist:
-                raise serializers.ValidationError('Recipe doesnt exist')
+                raise serializers.ValidationError('Recipe does not exist')
             obj, created = ReciepeShopList.objects.get_or_create(
                 user=user, recipe=recipe
             )
             if created:
-                serializer = ShoppingCartOrFavoriteRecipeSerializer(recipe)
+                serializer = ShortRecipeSerializer(recipe)
                 return Response(
                     serializer.data, status=status.HTTP_201_CREATED
                 )
@@ -92,7 +107,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 {'errors': 'Already exists'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         if request.method == 'DELETE':
             recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
             try:
@@ -104,6 +118,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
                     {'errors': 'Does not exist'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+        return Response({'errors': 'This method is not allowed'})
 
     @action(
         methods=('get',), detail=False, permission_classes=(IsAuthenticated,),
@@ -116,7 +131,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
         objects = user.shop_list.select_related('author').all()
         ingredient_dict = {}
         for obj in objects:
-            ingredients = RecipeIngredient.objects.filter(recipe=obj)
+            ingredients = RecipeIngredient.objects.filter(
+                recipe=obj
+            ).select_related('ingredient')
             for ingredient in ingredients:
                 name = ingredient.ingredient.name
                 amount = ingredient.amount
@@ -130,7 +147,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @action(
         methods=('post', 'delete'),
         detail=True,
-        serializer_class=ShoppingCartOrFavoriteRecipeSerializer,
+        serializer_class=ShortRecipeSerializer,
         permission_classes=(IsAuthenticated,),
     )
     def favorite(self, request, pk=None):
@@ -139,12 +156,12 @@ class RecipeViewSet(viewsets.ModelViewSet):
             try:
                 recipe = Recipe.objects.get(pk=self.kwargs.get('pk'))
             except Recipe.DoesNotExist:
-                raise serializers.ValidationError('Recipe doent exist')
+                raise serializers.ValidationError('Recipe does nott exist')
             obj, created = RecipeFavourite.objects.get_or_create(
                 user=user, recipe=recipe
             )
             if created:
-                serializer = ShoppingCartOrFavoriteRecipeSerializer(recipe)
+                serializer = ShortRecipeSerializer(recipe)
                 return Response(
                     serializer.data, status=status.HTTP_201_CREATED
                 )
@@ -164,12 +181,14 @@ class RecipeViewSet(viewsets.ModelViewSet):
                     {'errors': 'Does not exist'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+        return Response({'errors': 'This method is not allowed'})
 
 
 class SubscribeView(
     generics.ListAPIView, generics.CreateAPIView, generics.DestroyAPIView
 ):
-    '''Вьюсет для подписок.'''
+    """Вьюсет для подписок."""
+
     serializer_class = UserSubSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
@@ -187,7 +206,7 @@ class SubscribeView(
             )
         except UserFollowing.DoesNotExist:
             raise serializers.ValidationError(
-                'you were not subscribed at the first place'
+                'You were not subscribed at the first place'
             )
         model_to_delete.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

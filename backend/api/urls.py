@@ -1,5 +1,6 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
+from user.views import DjoserUserCustomView
 
 from api.views import (
     IngredientViewSet,
@@ -7,7 +8,6 @@ from api.views import (
     SubscribeView,
     TagViewSet,
 )
-from user.views import DjoserUserCustomView
 
 
 router_v1 = DefaultRouter()
@@ -16,6 +16,7 @@ router_v1.register(r'ingredients', IngredientViewSet, basename='ingredients')
 router_v1.register(r'tags', TagViewSet, basename='tags')
 router_v1.register(r'recipes', RecipeViewSet, basename='recipies')
 router_v1.register(r'users', DjoserUserCustomView, basename='djoser-user')
+
 urlpatterns = [
     path(
         'users/subscriptions/', SubscribeView.as_view(), name='subscriptions'
