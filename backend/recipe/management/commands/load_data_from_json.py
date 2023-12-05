@@ -2,11 +2,11 @@ import json
 from typing import Any
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand
 from django.db.utils import IntegrityError
-from django.contrib.auth import get_user_model
 
-from recipe.models import (Ingredient, Tag)
+from recipe.models import Ingredient, Tag
 
 User = get_user_model()
 
@@ -24,7 +24,7 @@ data_models_dict = {
 
 
 class Command(BaseCommand):
-    '''Менеджмент команда для выгрузки данных из json.'''
+    """Менеджмент команда для выгрузки данных из json."""
 
     def handle(self, *args: Any, **options: Any) -> None:
         for data_file_name in list_of_data:
@@ -35,8 +35,9 @@ class Command(BaseCommand):
             ) as file:
                 for model_data in json.load(file):
                     try:
-                        model = data_models_dict.get(
-                            data_file_name)(**model_data)
+                        model = data_models_dict.get(data_file_name)(
+                            **model_data
+                        )
                         model.save()
                         print('...', end='')
                     except IntegrityError:

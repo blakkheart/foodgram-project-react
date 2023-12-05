@@ -41,7 +41,6 @@ class Recipe(models.Model):
         Ingredient,
         blank=False,
         through='RecipeIngredient',
-        related_name='ingredients',
         help_text='Список ингредиентов',
     )
     tags = models.ManyToManyField(
@@ -72,8 +71,12 @@ class Recipe(models.Model):
 class RecipeFavourite(models.Model):
     """Промежуточная модель для избранных рецептов."""
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='recipe_favourite'
+    )
+    recipe = models.ForeignKey(
+        Recipe, on_delete=models.CASCADE, related_name='recipe_favourite'
+    )
     added = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self) -> str:
@@ -90,8 +93,12 @@ class RecipeFavourite(models.Model):
 class ReciepeShopList(models.Model):
     """Промежуточная модель для рецептов в корзине."""
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='recipe_cart'
+    )
+    recipe = models.ForeignKey(
+        Recipe, on_delete=models.CASCADE, related_name='recipe_cart'
+    )
     added = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self) -> str:
