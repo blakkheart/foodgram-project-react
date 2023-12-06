@@ -50,7 +50,9 @@ jobs:
           python -m flake8 backend/
           python backend/manage.py migrate
           python backend/manage.py load_data_from_json
-          newman run postman-collection/diploma.postman_collection.json 2>&1 | tee output.log
+          python backend/manage.py runserver &
+      - name: Test with postman tests
+        run: newman run postman-collection/diploma.postman_collection.json
 
         # set HTTP_PROXY='127.0.0.1:8000' && newman run postman-collection/diploma.postman_collection.json --insecure
   # frontend_tests:
