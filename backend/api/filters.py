@@ -1,7 +1,13 @@
 from django.contrib.auth import get_user_model
 from django_filters import rest_framework as filters
 
-from recipe.models import Ingredient, ReciepeShopList, Recipe, RecipeFavourite
+from recipe.models import (
+    Ingredient,
+    ReciepeShopList,
+    Recipe,
+    RecipeFavourite,
+    Tag
+)
 
 User = get_user_model()
 
@@ -18,7 +24,11 @@ class RecipeFilter(filters.FilterSet):
     author = filters.NumberFilter(
         field_name='author__id', lookup_expr='iexact'
     )
-    tags = filters.CharFilter(field_name='tags__slug', lookup_expr='iexact')
+    tags = filters.ModelMultipleChoiceFilter(
+        field_name='tags__slug',
+        to_field_name='slug',
+        queryset=Tag.objects.all()
+    )
 
     class Meta:
         model = Recipe
@@ -28,6 +38,16 @@ class RecipeFilter(filters.FilterSet):
             'author',
             'tags',
         )
+
+    # более логичное поведение тегов
+    # фильтр по И, а не по ИЛИ (не проходят тесты)
+    # def filter_slug(self, qs, name, value):
+    #     qs = qs.prefetch_related('tags')
+    #     tag_list = self.request.GET.getlist('tags')
+    #     if len(tag_list) == 2:
+    #         return qs.filter(tags__slug__iexact=tag_list[0]
+    #         ).filter(tags__slug__iexact=tag_list[1])
+    #     return qs.filter(tags__slug__iexact=tag_list[0])
 
     def favorites(self, queryset, name, value):
         if self.request is None or not self.request.user.is_authenticated:

@@ -62,15 +62,13 @@ class RecipeViewSet(viewsets.ModelViewSet):
     permission_classes = (RecipePermissions,)
 
     def get_queryset(self):
-        qrs = Recipe.objects.prefetch_related(
+        return Recipe.objects.prefetch_related(
             Prefetch(
                 'ingredients',
                 queryset=RecipeIngredient.objects.select_related('ingredient'),
             ),
             'tags',
         ).select_related('author')
-        print(qrs)
-        return qrs
 
     def get_serializer_class(self):
         if self.action == 'list' or self.action == 'retrive':
