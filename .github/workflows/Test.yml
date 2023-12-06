@@ -52,7 +52,7 @@ jobs:
           python backend/manage.py load_data_from_json
           python backend/manage.py runserver 127.0.0.1:8000 &
       - name: Test with postman tests
-        run: newman run postman-collection/diploma.postman_collection.json --timeout-request 3000
+        run: newman run postman-collection/diploma.postman_collection.json --verbose
 
         # set HTTP_PROXY='127.0.0.1:8000' && newman run postman-collection/diploma.postman_collection.json --insecure
   # frontend_tests:
