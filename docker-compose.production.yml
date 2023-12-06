@@ -14,7 +14,7 @@ services:
       - pg_data:/var/lib/postgresql/data
   
   backend:
-    build: ./backend/
+    image: blakkheart/foodgram_backend
     env_file:
       - .env
     depends_on:
@@ -26,13 +26,13 @@ services:
   frontend:
     env_file:
       - .env
-    build: ./frontend/
+    image: blakkheart/foodgram_frontend
     command: cp -r /app/build/. /frontend_static/
     volumes:
       - static:/frontend_static
   
   gateway:
-    build: ./gateway/
+    image: blakkheart/foodgram_frontend
     depends_on:
       - backend
     ports:
