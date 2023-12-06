@@ -52,7 +52,7 @@ jobs:
           python backend/manage.py load_data_from_json
 
       - name: Run Postman tests
-        run: set HTTP_PROXY=[127.0.0.1:8000] && newman run postman-collection/diploma.postman_collection.json
+        run: set HTTP_PROXY=127.0.0.1:8000 && newman run postman-collection/diploma.postman_collection.json
 
   frontend_tests:
     runs-on: ubuntu-latest
