@@ -2,7 +2,7 @@ name: Foodgram Workflow For Build and Deploy
 on:
   workflow_run:
     workflows: [Foodgram Workflow For Tests]
-    branches: [main]
+    branches: [master]
     types:
       - completed
 
