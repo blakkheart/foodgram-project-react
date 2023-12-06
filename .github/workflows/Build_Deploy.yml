@@ -1,7 +1,7 @@
-name: Kittygram Workflow For Build and Deploy
+name: Foodgram Workflow For Build and Deploy
 on:
   workflow_run:
-    workflows: [Kittygram Workflow For Tests]
+    workflows: [Foodgram Workflow For Tests]
     branches: [main]
     types:
       - completed

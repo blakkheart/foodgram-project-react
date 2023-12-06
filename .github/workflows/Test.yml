@@ -1,4 +1,4 @@
-name: Kittygram Workflow For Tests
+name: Foodgram Workflow For Tests
 on: push
 
 jobs:
