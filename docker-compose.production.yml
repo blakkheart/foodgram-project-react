@@ -27,7 +27,7 @@ services:
     env_file:
       - .env
     image: blakkheart/foodgram_frontend
-    command: cp -r /app/build/. /frontend_static/
+    command: cp -r /app/build/. /frontend/
     volumes:
       - static:/frontend_static
   
@@ -38,5 +38,5 @@ services:
     ports:
       - 8000:80
     volumes:
-      - static:/static
+      - static:/static/
       - media:/app/media
