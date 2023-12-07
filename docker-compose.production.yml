@@ -18,15 +18,15 @@ services:
     depends_on:
       - db
     volumes:
-      - media:/media
+      - media:/app/media
       - static:/backend_static
   
   frontend:
     env_file: .env
     image: blakkheart/foodgram_frontend
-    command: cp -r /app/build/. /static/
+    command: cp -r /app/build/. /frontend_static/
     volumes:
-      - static:/static
+      - static:/frontend_static
   
   gateway:
     image: blakkheart/foodgram_gateway
@@ -35,5 +35,5 @@ services:
     ports:
       - 8000:80
     volumes:
-      - static:/static/
+      - static:/static
       - media:/media
