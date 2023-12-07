@@ -21,16 +21,16 @@ services:
       - db
     #command: cp -r /app/media/. /media/
     volumes:
-      - media:/app/media
+      - media:/media
       - static:/backend_static
   
   frontend:
     env_file:
       - .env
     image: blakkheart/foodgram_frontend
-    command: cp -r /app/build/. /frontend/
+    command: cp -r /app/build/. /static/
     volumes:
-      - static:/frontend_static
+      - static:/static
   
   gateway:
     image: blakkheart/foodgram_gateway
@@ -40,4 +40,4 @@ services:
       - 8000:80
     volumes:
       - static:/static/
-      - media:/media/
+      - media:/media
