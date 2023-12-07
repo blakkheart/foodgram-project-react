@@ -8,25 +8,21 @@ volumes:
 services:
   db:
     image: postgres:13.10
-    env_file:
-      - .env
+    env_file: .env
     volumes:
       - pg_data:/var/lib/postgresql/data
   
   backend:
     image: blakkheart/foodgram_backend
-    env_file:
-      - .env
+    env_file: .env
     depends_on:
       - db
-    #command: cp -r /app/media/. /media/
     volumes:
       - media:/media
       - static:/backend_static
   
   frontend:
-    env_file:
-      - .env
+    env_file: .env
     image: blakkheart/foodgram_frontend
     command: cp -r /app/build/. /static/
     volumes:
