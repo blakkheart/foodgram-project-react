@@ -19,7 +19,7 @@ services:
       - .env
     depends_on:
       - db
-    command: cp -r /app/media/. /media/
+    #command: cp -r /app/media/. /media/
     volumes:
       - media:/app/media
       - static:/backend_static
