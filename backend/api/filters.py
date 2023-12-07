@@ -22,7 +22,7 @@ class RecipeFilter(filters.FilterSet):
         method='shop_cart', field_name='is_in_shopping_cart'
     )
     author = filters.NumberFilter(
-        field_name='author__id', lookup_expr='iexact'
+        field_name='author__id'
     )
     tags = filters.ModelMultipleChoiceFilter(
         field_name='tags__slug',
