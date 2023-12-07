@@ -32,7 +32,7 @@ services:
       - static:/frontend_static
   
   gateway:
-    image: blakkheart/foodgram_frontend
+    image: blakkheart/foodgram_gateway
     depends_on:
       - backend
     ports:
