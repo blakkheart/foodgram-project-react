@@ -53,28 +53,3 @@ jobs:
           python backend/manage.py runserver 127.0.0.1:8000 &
       - name: Test with postman tests
         run: newman run postman-collection/diploma.postman_collection.json --verbose
-# попытка прогнать тесты из постмана, но почему-то два теста работают локально, но не работают на гите
-# возожно, позже получится исправить
-#          python backend/manage.py migrate
-#         python backend/manage.py load_data_from_json
-#          python backend/manage.py runserver 127.0.0.1:8000 &
-#      - name: Test with postman tests
-#        run: newman run postman-collection/diploma.postman_collection.json --verbose
-
-# frontend_tests:
-#   runs-on: ubuntu-latest
-#   steps:
-#     - name: Checkout the repo
-#       uses: actions/checkout@v3
-#     - name: Set up NodeJS
-#       uses: actions/setup-node@v3
-#       with:
-#         node-version: 18
-#     - name: Install dependencies
-#       run: |
-#         cd frontend/
-#         npm ci
-#     - name: Test frontend
-#       run: |
-#         cd frontend/
-#         npm run test
