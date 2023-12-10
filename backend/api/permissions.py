@@ -13,7 +13,7 @@ class DjoserMePermission(permissions.BasePermission):
         return True
 
 
-class RecipePermissions(permissions.BasePermission):
+class IsAuthorOrReadOnly(permissions.BasePermission):
     """Пермишен для рецептов."""
 
     def has_permission(self, request, view):

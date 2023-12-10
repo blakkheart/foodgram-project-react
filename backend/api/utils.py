@@ -8,7 +8,7 @@ from reportlab.pdfgen import canvas
 from rest_framework import status
 
 
-def generate_pdf_file_response(items: dict[str, list]) -> FileResponse:
+def generate_pdf_file_response(items: set[str, str, float]) -> FileResponse:
     """Функция для генерации pdf."""
     buffer = BytesIO()
     pdf_canvas = canvas.Canvas(buffer)
@@ -21,8 +21,8 @@ def generate_pdf_file_response(items: dict[str, list]) -> FileResponse:
     pdf_canvas.drawString(0, 720, '—' * 80)
     page_number = 1
     y = 700
-    for name, value in items.items():
-        pdf_canvas.drawString(100, y, f'{name} ({value[1]}) — {value[0]}')
+    for name, value, amount in sorted(items):
+        pdf_canvas.drawString(100, y, f'{name} ({value}) — {amount}')
         y -= 20
         if y < 50:
             pdf_canvas.setFont('Verdana', 11)

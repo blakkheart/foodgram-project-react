@@ -63,7 +63,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'foodgram.wsgi.application'
 
-DB_NAME = 'postgresql'
+DB_NAME = 'sqlite3'
 
 if DB_NAME == 'postgresql':
 
@@ -141,7 +141,7 @@ REST_FRAMEWORK = {
         'django_filters.rest_framework.DjangoFilterBackend',
     ),
 
-    'DEFAULT_PAGINATION_CLASS': 'api.paginations.CustomPageNumberPagination',
+    'DEFAULT_PAGINATION_CLASS': 'api.paginations.PageNumberPagination',
     'PAGE_SIZE': 10,
 
 }

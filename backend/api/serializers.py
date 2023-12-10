@@ -1,35 +1,23 @@
-import base64
-
 from django.contrib.auth import get_user_model
-from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
+from djoser.serializers import UserSerializer
+from drf_extra_fields.fields import Base64ImageField
 from rest_framework import serializers
 
 from api.serializers_mixins import UserMixinSerializer
-from recipe.models import (
-    Ingredient,
-    ReciepeShopList,
-    Recipe,
-    RecipeFavourite,
-    RecipeIngredient,
-    Tag,
-)
+from recipe.models import Ingredient, Recipe, RecipeIngredient, Tag
 from user.models import UserFollowing
 
 
 User = get_user_model()
 
 
-class Base64ImageField(serializers.ImageField):
-    """Сериализатор для изображений."""
-
-    def to_internal_value(self, data):
-        if isinstance(data, str) and data.startswith('data:image'):
-            format, imgstr = data.split(';base64,')
-            ext = format.split('/')[-1]
-            data = ContentFile(base64.b64decode(imgstr), name='temp.' + ext)
-        return super().to_internal_value(data)
+class Base64ImageField(Base64ImageField):
+    def validate_empty_values(self, data):
+        if not data:
+            raise serializers.ValidationError()
+        return super().validate_empty_values(data)
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -69,7 +57,7 @@ class IngredientRecipeSerializer(serializers.ModelSerializer):
         )
 
 
-class UserSerializer(UserMixinSerializer):
+class UserSerializer(UserSerializer, UserMixinSerializer):
     """Сериализитор для юзера."""
 
     class Meta:
@@ -91,7 +79,7 @@ class UserSerializer(UserMixinSerializer):
 class RecipeSerializer(serializers.ModelSerializer):
     """Сериализитор для рецептов для показа."""
 
-    image = Base64ImageField()
+    image = Base64ImageField(read_only=True, represent_in_base64=True)
     tags = TagSerializer(many=True,)
     ingredients = IngredientRecipeSerializer(
         many=True, source='ingredients_with_amount'
@@ -117,25 +105,10 @@ class RecipeSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'author')
 
     def get_is_favorited(self, obj):
-        user = self.context.get('request').user
-        if not user.is_authenticated:
-            return False
-        return (
-            RecipeFavourite.objects.select_related('recipe', 'user')
-            .filter(user=user, recipe=obj)
-            .exists()
-        )
+        return obj.is_favorited
 
     def get_is_in_shopping_cart(self, obj):
-        user = self.context.get('request').user
-        if not user.is_authenticated:
-            return False
-        return (
-            ReciepeShopList.objects.select_related('recipe', 'user')
-            .prefetch_related('recipe__tags')
-            .filter(user=user, recipe=obj)
-            .exists()
-        )
+        return obj.is_in_shopping_cart
 
 
 class ShortRecipeSerializer(serializers.ModelSerializer):
@@ -147,7 +120,7 @@ class ShortRecipeSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'name', 'image', 'cooking_time')
 
 
-class IngredientSerializerPOST(serializers.ModelSerializer):
+class CreateIngredientSerializer(serializers.ModelSerializer):
     """Сериализитор для ингредиентов на запись."""
 
     id = serializers.IntegerField()
@@ -156,12 +129,17 @@ class IngredientSerializerPOST(serializers.ModelSerializer):
         model = RecipeIngredient
         fields = ('id', 'amount')
 
+    def validate_amount(self, value):
+        if value < 1:
+            raise serializers.ValidationError('Amount cannot be less then 1')
+        return value
 
-class RecipeSerializerPOST(serializers.ModelSerializer):
+
+class CreateRecipeSerializer(serializers.ModelSerializer):
     """Сериализитор для рецептов на запись."""
 
     image = Base64ImageField()
-    ingredients = IngredientSerializerPOST(many=True, required=True)
+    ingredients = CreateIngredientSerializer(many=True, required=True)
     author = UserSerializer(read_only=True)
 
     class Meta:
@@ -186,22 +164,20 @@ class RecipeSerializerPOST(serializers.ModelSerializer):
             raise serializers.ValidationError('Tags should not be doubled')
         recipe = Recipe.objects.create(**validated_data)
         recipe.tags.set(tags)
+        ingredients_id = Ingredient.objects.values_list('id', flat=True)
         for ingredient in ingredients:
-            try:
-                ing = Ingredient.objects.get(pk=ingredient.get('id'))
-            except Ingredient.DoesNotExist:
+            if ingredient.get('id') not in ingredients_id:
                 recipe.delete()
                 raise serializers.ValidationError('Ingredient does not exist')
             amount = ingredient.get('amount')
-            if amount < 1:
-                recipe.delete()
-                raise serializers.ValidationError(
-                    'Amount cannot be less then 1'
-                )
             try:
                 obj, created = RecipeIngredient.objects.select_related(
                     'ingredient', 'recipe'
-                ).get_or_create(ingredient=ing, recipe=recipe, amount=amount)
+                ).get_or_create(
+                    ingredient_id=ingredient.get('id'),
+                    recipe=recipe,
+                    amount=amount,
+                )
             except IntegrityError:
                 recipe.delete()
                 raise serializers.ValidationError(
@@ -262,13 +238,14 @@ class RecipeSerializerPOST(serializers.ModelSerializer):
 
     def to_representation(self, value):
         if isinstance(value, Recipe):
+            value = self.context['view'].get_queryset().get(id=value.pk)
             serializer = RecipeSerializer(value, context=self.context)
         else:
             raise Exception('Unexpected type of tagged object')
         return serializer.data
 
 
-class UserSubSerializer(UserMixinSerializer):
+class UserSubscribeSerializer(UserSerializer, UserMixinSerializer):
     """Сериализитор для подписок пользователя."""
 
     recipes_count = serializers.SerializerMethodField()

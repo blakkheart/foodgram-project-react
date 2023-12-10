@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.db.models import Prefetch
+from django.db.models import Exists, OuterRef, Prefetch, Sum, Value
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
 from rest_framework import generics, serializers, status, viewsets
@@ -11,16 +11,17 @@ from rest_framework.permissions import (
 from rest_framework.response import Response
 
 from api.filters import IngredientFilter, RecipeFilter
-from api.permissions import RecipePermissions
+from api.permissions import IsAuthorOrReadOnly
 from api.serializers import (
+    CreateRecipeSerializer,
     IngredientSerializer,
     RecipeSerializer,
-    RecipeSerializerPOST,
     ShortRecipeSerializer,
     TagSerializer,
-    UserSubSerializer,
+    UserSubscribeSerializer,
 )
 from api.utils import generate_pdf_file_response
+from api.views_mixins import RelationMixin
 from recipe.models import (
     Ingredient,
     ReciepeShopList,
@@ -53,70 +54,58 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = IngredientFilter
 
 
-class RecipeViewSet(viewsets.ModelViewSet):
+class RecipeViewSet(viewsets.ModelViewSet, RelationMixin):
     """Вьюсет для рецептов."""
 
     http_method_names = ['get', 'post', 'delete', 'patch']
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class = RecipeFilter
-    permission_classes = (RecipePermissions,)
+    permission_classes = (IsAuthorOrReadOnly,)
 
     def get_queryset(self):
-        return Recipe.objects.prefetch_related(
+        user = self.request.user
+        queryset = Recipe.objects.prefetch_related(
             Prefetch(
                 'ingredients',
                 queryset=RecipeIngredient.objects.select_related('ingredient'),
             ),
             'tags',
         ).select_related('author')
+        if user.is_authenticated:
+            recipe_favourite = RecipeFavourite.objects.filter(
+                user=user, recipe=OuterRef('pk')
+            )
+            recipe_shop_list = ReciepeShopList.objects.filter(
+                user=user, recipe=OuterRef('pk')
+            )
+            return queryset.annotate(
+                is_favorited=Exists(recipe_favourite),
+                is_in_shopping_cart=Exists(recipe_shop_list),
+            )
+        return queryset.annotate(
+            is_favorited=Value(False), is_in_shopping_cart=Value(False)
+        )
 
     def get_serializer_class(self):
         if self.action == 'list' or self.action == 'retrive':
             return RecipeSerializer
-        return RecipeSerializerPOST
+        return CreateRecipeSerializer
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
     @action(
-        methods=('post', 'delete'),
+        methods=('post',),
         detail=True,
         serializer_class=ShortRecipeSerializer,
         permission_classes=(IsAuthenticated,),
     )
     def shopping_cart(self, request, pk=None):
-        user = request.user
-        if request.method == 'POST':
-            try:
-                recipe = Recipe.objects.select_related('author').get(
-                    pk=self.kwargs.get('pk')
-                )
-            except Recipe.DoesNotExist:
-                raise serializers.ValidationError('Recipe does not exist')
-            obj, created = ReciepeShopList.objects.get_or_create(
-                user=user, recipe=recipe
-            )
-            if created:
-                serializer = ShortRecipeSerializer(recipe)
-                return Response(
-                    serializer.data, status=status.HTTP_201_CREATED
-                )
-            return Response(
-                {'errors': 'Already exists'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if request.method == 'DELETE':
-            recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
-            try:
-                obj = ReciepeShopList.objects.get(user=user, recipe=recipe)
-                obj.delete()
-                return Response(status=status.HTTP_204_NO_CONTENT)
-            except ReciepeShopList.DoesNotExist:
-                return Response(
-                    {'errors': 'Does not exist'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        return Response({'errors': 'This method is not allowed'})
+        return self.create_relation(request, ReciepeShopList)
+
+    @shopping_cart.mapping.delete
+    def delete_shopping_cart(self, request, pk=None):
+        return self.delete_relation(request, ReciepeShopList)
 
     @action(
         methods=('get',), detail=False, permission_classes=(IsAuthenticated,),
@@ -124,62 +113,28 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def download_shopping_cart(self, request, pk=None):
         if not request.user.is_authenticated:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        current_user = request.user
-        user = User.objects.get(username=current_user)
-        objects = user.shop_list.select_related('author').all()
-        ingredient_dict = {}
-        for obj in objects:
-            ingredients = RecipeIngredient.objects.filter(
-                recipe=obj
-            ).select_related('ingredient')
-            for ingredient in ingredients:
-                name = ingredient.ingredient.name
-                amount = ingredient.amount
-                units = ingredient.ingredient.measurement_unit
-                if ingredient_dict.get(name):
-                    ingredient_dict[name][0] += amount
-                else:
-                    ingredient_dict[name] = [amount, units]
-        return generate_pdf_file_response(items=ingredient_dict)
+        ingredients = ReciepeShopList.objects.filter(
+            user=request.user
+        ).values_list(
+            'recipe_id__ingredients__name',
+            'recipe_id__ingredients__measurement_unit',
+            Sum('recipe_id__ingredients__ingredients_with_amount__amount'),
+        )
+        ingredients = set(ingredients)
+        return generate_pdf_file_response(items=ingredients)
 
     @action(
-        methods=('post', 'delete'),
+        methods=('post',),
         detail=True,
         serializer_class=ShortRecipeSerializer,
         permission_classes=(IsAuthenticated,),
     )
     def favorite(self, request, pk=None):
-        user = request.user
-        if request.method == 'POST':
-            try:
-                recipe = Recipe.objects.get(pk=self.kwargs.get('pk'))
-            except Recipe.DoesNotExist:
-                raise serializers.ValidationError('Recipe does nott exist')
-            obj, created = RecipeFavourite.objects.get_or_create(
-                user=user, recipe=recipe
-            )
-            if created:
-                serializer = ShortRecipeSerializer(recipe)
-                return Response(
-                    serializer.data, status=status.HTTP_201_CREATED
-                )
-            return Response(
-                {'errors': 'Already exists'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        return self.create_relation(request, RecipeFavourite)
 
-        if request.method == 'DELETE':
-            recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
-            try:
-                obj = RecipeFavourite.objects.get(user=user, recipe=recipe)
-                obj.delete()
-                return Response(status=status.HTTP_204_NO_CONTENT)
-            except RecipeFavourite.DoesNotExist:
-                return Response(
-                    {'errors': 'Does not exist'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        return Response({'errors': 'This method is not allowed'})
+    @favorite.mapping.delete
+    def delete_favorite(self, request, pk=None):
+        return self.delete_relation(request, RecipeFavourite)
 
 
 class SubscribeView(
@@ -187,7 +142,7 @@ class SubscribeView(
 ):
     """Вьюсет для подписок."""
 
-    serializer_class = UserSubSerializer
+    serializer_class = UserSubscribeSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
     def get_queryset(self):

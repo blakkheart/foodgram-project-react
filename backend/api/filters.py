@@ -1,13 +1,8 @@
 from django.contrib.auth import get_user_model
 from django_filters import rest_framework as filters
 
-from recipe.models import (
-    Ingredient,
-    ReciepeShopList,
-    Recipe,
-    RecipeFavourite,
-    Tag
-)
+from recipe.models import Ingredient, Recipe, Tag
+
 
 User = get_user_model()
 
@@ -16,18 +11,16 @@ class RecipeFilter(filters.FilterSet):
     """Фильтр для рецептов."""
 
     is_favorited = filters.BooleanFilter(
-        method='favorites', field_name='is_favorited'
+        method='filter_is_favorited', field_name='is_favorited'
     )
     is_in_shopping_cart = filters.BooleanFilter(
-        method='shop_cart', field_name='is_in_shopping_cart'
+        method='filter_is_in_shopping_cart', field_name='is_in_shopping_cart'
     )
-    author = filters.NumberFilter(
-        field_name='author__id'
-    )
+    author = filters.NumberFilter(field_name='author__id')
     tags = filters.ModelMultipleChoiceFilter(
         field_name='tags__slug',
         to_field_name='slug',
-        queryset=Tag.objects.all()
+        queryset=Tag.objects.all(),
     )
 
     class Meta:
@@ -39,39 +32,17 @@ class RecipeFilter(filters.FilterSet):
             'tags',
         )
 
-    # более логичное поведение тегов
-    # фильтр по И, а не по ИЛИ (не проходят тесты)
-    # def filter_slug(self, qs, name, value):
-    #     qs = qs.prefetch_related('tags')
-    #     tag_list = self.request.GET.getlist('tags')
-    #     if len(tag_list) == 2:
-    #         return qs.filter(tags__slug__iexact=tag_list[0]
-    #         ).filter(tags__slug__iexact=tag_list[1])
-    #     return qs.filter(tags__slug__iexact=tag_list[0])
-
-    def favorites(self, queryset, name, value):
-        if self.request is None or not self.request.user.is_authenticated:
-            return Recipe.objects.none()
+    def filter_is_favorited(self, queryset, name, value):
         user = self.request.user
-        recipes = RecipeFavourite.objects.filter(user=user)
-        recipes_set = set()
-        for r in recipes:
-            recipes_set.add(r.recipe.id)
-        if value is True:
-            return Recipe.objects.filter(id__in=recipes_set)
-        return Recipe.objects.exclude(id__in=recipes_set)
+        if value and user.is_authenticated:
+            return queryset.filter(recipe_favourite__user=user)
+        return queryset
 
-    def shop_cart(self, queryset, name, value):
-        if self.request is None or not self.request.user.is_authenticated:
-            return Recipe.objects.none()
+    def filter_is_in_shopping_cart(self, queryset, name, value):
         user = self.request.user
-        recipes = ReciepeShopList.objects.filter(user=user)
-        recipes_set = set()
-        for r in recipes:
-            recipes_set.add(r.recipe.id)
-        if value is True:
-            return Recipe.objects.filter(id__in=recipes_set)
-        return Recipe.objects.exclude(id__in=recipes_set)
+        if value and user.is_authenticated:
+            return queryset.filter(recipe_cart__user=user)
+        return queryset
 
 
 class IngredientFilter(filters.FilterSet):
