@@ -63,7 +63,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'foodgram.wsgi.application'
 
-DB_NAME = 'sqlite3'
+DB_NAME = 'postgresql'
 
 if DB_NAME == 'postgresql':
 
