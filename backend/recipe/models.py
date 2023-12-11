@@ -2,6 +2,9 @@ from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator
 from django.db import models
 
+from recipe.managers import RecipeManager, RecipeShopListManager
+
+
 User = get_user_model()
 
 
@@ -60,6 +63,8 @@ class Recipe(models.Model):
         User, on_delete=models.CASCADE, related_name='recipies'
     )
     pub_date = models.DateTimeField(auto_now=False, auto_now_add=True)
+    objects = models.Manager()
+    with_params = RecipeManager()
 
     def __str__(self) -> str:
         return self.name
@@ -100,6 +105,8 @@ class ReciepeShopList(models.Model):
         Recipe, on_delete=models.CASCADE, related_name='recipe_cart'
     )
     added = models.DateTimeField(auto_now_add=True, db_index=True)
+    objects = models.Manager()
+    ingredients = RecipeShopListManager()
 
     def __str__(self) -> str:
         return f'{self.recipe} in {self.user} cart'

@@ -1,23 +1,17 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
-from djoser.serializers import UserSerializer
+from djoser.serializers import UserSerializer as UserSerializerDjango
 from drf_extra_fields.fields import Base64ImageField
 from rest_framework import serializers
 
 from api.serializers_mixins import UserMixinSerializer
+from api.validators import valid_image
 from recipe.models import Ingredient, Recipe, RecipeIngredient, Tag
 from user.models import UserFollowing
 
 
 User = get_user_model()
-
-
-class Base64ImageField(Base64ImageField):
-    def validate_empty_values(self, data):
-        if not data:
-            raise serializers.ValidationError()
-        return super().validate_empty_values(data)
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -57,7 +51,7 @@ class IngredientRecipeSerializer(serializers.ModelSerializer):
         )
 
 
-class UserSerializer(UserSerializer, UserMixinSerializer):
+class UserSerializer(UserSerializerDjango, UserMixinSerializer):
     """Сериализитор для юзера."""
 
     class Meta:
@@ -79,14 +73,14 @@ class UserSerializer(UserSerializer, UserMixinSerializer):
 class RecipeSerializer(serializers.ModelSerializer):
     """Сериализитор для рецептов для показа."""
 
-    image = Base64ImageField(read_only=True, represent_in_base64=True)
+    image = Base64ImageField()
     tags = TagSerializer(many=True,)
     ingredients = IngredientRecipeSerializer(
         many=True, source='ingredients_with_amount'
     )
     author = UserSerializer(read_only=True)
-    is_favorited = serializers.SerializerMethodField()
-    is_in_shopping_cart = serializers.SerializerMethodField()
+    is_favorited = serializers.BooleanField(default=False)
+    is_in_shopping_cart = serializers.BooleanField(default=False)
 
     class Meta:
         model = Recipe
@@ -103,12 +97,6 @@ class RecipeSerializer(serializers.ModelSerializer):
             'cooking_time',
         )
         read_only_fields = ('id', 'author')
-
-    def get_is_favorited(self, obj):
-        return obj.is_favorited
-
-    def get_is_in_shopping_cart(self, obj):
-        return obj.is_in_shopping_cart
 
 
 class ShortRecipeSerializer(serializers.ModelSerializer):
@@ -138,7 +126,7 @@ class CreateIngredientSerializer(serializers.ModelSerializer):
 class CreateRecipeSerializer(serializers.ModelSerializer):
     """Сериализитор для рецептов на запись."""
 
-    image = Base64ImageField()
+    image = Base64ImageField(validators=[valid_image])
     ingredients = CreateIngredientSerializer(many=True, required=True)
     author = UserSerializer(read_only=True)
 
@@ -205,10 +193,6 @@ class CreateRecipeSerializer(serializers.ModelSerializer):
                 )
             ingr_set.add(ingredient.get('id'))
             amount = ingredient.get('amount')
-            if amount < 1:
-                raise serializers.ValidationError(
-                    'Amount cannot be less then 1'
-                )
             RecipeIngredient.objects.create(
                 ingredient=ing,
                 recipe=Recipe.objects.get(id=recipe_id),
@@ -236,16 +220,15 @@ class CreateRecipeSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
-    def to_representation(self, value):
-        if isinstance(value, Recipe):
-            value = self.context['view'].get_queryset().get(id=value.pk)
-            serializer = RecipeSerializer(value, context=self.context)
-        else:
+    def to_representation(self, instance):
+        if not isinstance(instance, Recipe):
             raise Exception('Unexpected type of tagged object')
+        instance = self.context['view'].get_queryset().get(id=instance.pk)
+        serializer = RecipeSerializer(instance, context=self.context)
         return serializer.data
 
 
-class UserSubscribeSerializer(UserSerializer, UserMixinSerializer):
+class UserSubscribeSerializer(UserSerializerDjango, UserMixinSerializer):
     """Сериализитор для подписок пользователя."""
 
     recipes_count = serializers.SerializerMethodField()
@@ -292,6 +275,16 @@ class UserSubscribeSerializer(UserSerializer, UserMixinSerializer):
         return user.recipies.count()
 
     def create(self, validated_data):
+        user_to_follow = validated_data['user_to_follow']
+        user = validated_data['user']
+        obj, created = UserFollowing.objects.get_or_create(
+            user=user_to_follow, following_user=user
+        )
+        if not created:
+            raise serializers.ValidationError('Cannot subscribe twice')
+        return user_to_follow
+
+    def validate(self, data):
         id_user_to_follow = self.context.get('view').kwargs.get('pk')
         user_to_follow = get_object_or_404(User, pk=id_user_to_follow)
         user = get_object_or_404(
@@ -299,9 +292,6 @@ class UserSubscribeSerializer(UserSerializer, UserMixinSerializer):
         )
         if user == user_to_follow:
             raise serializers.ValidationError('Cannot subscribe to yourself')
-        obj, created = UserFollowing.objects.get_or_create(
-            user=user_to_follow, following_user=user
-        )
-        if not created:
-            raise serializers.ValidationError('Cannot subscribe twice')
-        return user_to_follow
+        data['user_to_follow'] = user_to_follow
+        data['user'] = user
+        return data

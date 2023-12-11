@@ -1,5 +1,4 @@
 from django.contrib.auth import get_user_model
-from django.db.models import Exists, OuterRef, Prefetch, Sum, Value
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
 from rest_framework import generics, serializers, status, viewsets
@@ -27,7 +26,6 @@ from recipe.models import (
     ReciepeShopList,
     Recipe,
     RecipeFavourite,
-    RecipeIngredient,
     Tag,
 )
 from user.models import UserFollowing
@@ -63,31 +61,13 @@ class RecipeViewSet(viewsets.ModelViewSet, RelationMixin):
     permission_classes = (IsAuthorOrReadOnly,)
 
     def get_queryset(self):
-        user = self.request.user
-        queryset = Recipe.objects.prefetch_related(
-            Prefetch(
-                'ingredients',
-                queryset=RecipeIngredient.objects.select_related('ingredient'),
-            ),
-            'tags',
-        ).select_related('author')
-        if user.is_authenticated:
-            recipe_favourite = RecipeFavourite.objects.filter(
-                user=user, recipe=OuterRef('pk')
-            )
-            recipe_shop_list = ReciepeShopList.objects.filter(
-                user=user, recipe=OuterRef('pk')
-            )
-            return queryset.annotate(
-                is_favorited=Exists(recipe_favourite),
-                is_in_shopping_cart=Exists(recipe_shop_list),
-            )
-        return queryset.annotate(
-            is_favorited=Value(False), is_in_shopping_cart=Value(False)
+
+        return Recipe.with_params.with_shopcart_and_favorite(
+            user=self.request.user
         )
 
     def get_serializer_class(self):
-        if self.action == 'list' or self.action == 'retrive':
+        if self.action in ('list', 'retrive'):
             return RecipeSerializer
         return CreateRecipeSerializer
 
@@ -113,12 +93,8 @@ class RecipeViewSet(viewsets.ModelViewSet, RelationMixin):
     def download_shopping_cart(self, request, pk=None):
         if not request.user.is_authenticated:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        ingredients = ReciepeShopList.objects.filter(
+        ingredients = ReciepeShopList.ingredients.all_ingredients(
             user=request.user
-        ).values_list(
-            'recipe_id__ingredients__name',
-            'recipe_id__ingredients__measurement_unit',
-            Sum('recipe_id__ingredients__ingredients_with_amount__amount'),
         )
         ingredients = set(ingredients)
         return generate_pdf_file_response(items=ingredients)
