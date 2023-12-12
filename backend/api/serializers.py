@@ -160,16 +160,20 @@ class CreateRecipeSerializer(serializers.ModelSerializer):
             ingredient_ids.append(ingredient.get('id'))
         if len(ingredient_ids) != len(set(ingredient_ids)):
             raise serializers.ValidationError('Ingredients cannot be doubled')
+        prepared_ingredients = Ingredient.objects.filter(id__in=ingredient_ids)
+        data['prepared_ingredients'] = prepared_ingredients
         return data
 
     @transaction.atomic
-    def set_ingredients_and_tags(self, recipe, ingredients, tags):
+    def set_ingredients_and_tags(
+        self, recipe, ingredients, prepared_ingredients, tags
+    ):
         recipe.tags.set(tags)
         RecipeIngredient.objects.bulk_create(
             [
                 RecipeIngredient(
                     recipe=recipe,
-                    ingredient=Ingredient.objects.get(pk=ingredient['id']),
+                    ingredient=prepared_ingredients.get(pk=ingredient['id']),
                     amount=ingredient['amount'],
                 )
                 for ingredient in ingredients
@@ -179,16 +183,21 @@ class CreateRecipeSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         ingredients = validated_data.pop('ingredients')
+        prepared_ingredients = validated_data.pop('prepared_ingredients')
         tags = validated_data.pop('tags')
         recipe = Recipe.objects.create(**validated_data)
         self.set_ingredients_and_tags(
-            recipe=recipe, ingredients=ingredients, tags=tags
+            recipe=recipe,
+            ingredients=ingredients,
+            prepared_ingredients=prepared_ingredients,
+            tags=tags,
         )
         return recipe
 
     @transaction.atomic
     def update(self, instance, validated_data):
         ingredients = validated_data.pop('ingredients', [])
+        prepared_ingredients = validated_data.pop('prepared_ingredients')
         tags = validated_data.pop('tags', [])
         instance.name = validated_data.get('name', instance.name)
         instance.text = validated_data.get('text', instance.text)
@@ -198,7 +207,10 @@ class CreateRecipeSerializer(serializers.ModelSerializer):
         instance.image = validated_data.get('image', instance.image)
         RecipeIngredient.objects.filter(recipe=instance).delete()
         self.set_ingredients_and_tags(
-            recipe=instance, ingredients=ingredients, tags=tags
+            recipe=instance,
+            ingredients=ingredients,
+            prepared_ingredients=prepared_ingredients,
+            tags=tags,
         )
         instance.save()
         return instance
