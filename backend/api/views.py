@@ -129,13 +129,11 @@ class SubscribeView(
         user = get_object_or_404(User, username=self.request.user.username)
         id_user_to_unfollow = self.kwargs.get('pk')
         user_to_unfollow = get_object_or_404(User, pk=id_user_to_unfollow)
-        try:
-            model_to_delete = UserFollowing.objects.get(
-                user=user_to_unfollow, following_user=user
-            )
-        except UserFollowing.DoesNotExist:
+        del_count, _ = UserFollowing.objects.filter(
+            user=user_to_unfollow, following_user=user
+        ).delete()
+        if not del_count:
             raise serializers.ValidationError(
                 'You were not subscribed at the first place'
             )
-        model_to_delete.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

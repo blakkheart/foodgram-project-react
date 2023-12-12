@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from djoser.serializers import UserSerializer as UserSerializerDjango
 from drf_extra_fields.fields import Base64ImageField
@@ -143,71 +143,53 @@ class CreateRecipeSerializer(serializers.ModelSerializer):
             'cooking_time',
         )
 
+    def validate(self, data):
+        if not data.get('tags'):
+            raise serializers.ValidationError('Tags cannot be empty')
+        if not data.get('ingredients'):
+            raise serializers.ValidationError('Ingredients cannot be empty')
+        if len(data.get('tags')) != len(set(data.get('tags'))):
+            raise serializers.ValidationError('Tags cannot be doubled')
+        ingredients_ids_from_db = set(
+            Ingredient.objects.values_list('id', flat=True)
+        )
+        ingredient_ids = []
+        for ingredient in data.get('ingredients'):
+            if ingredient.get('id') not in ingredients_ids_from_db:
+                raise serializers.ValidationError('Ingredient does not exist')
+            ingredient_ids.append(ingredient.get('id'))
+        if len(ingredient_ids) != len(set(ingredient_ids)):
+            raise serializers.ValidationError('Ingredients cannot be doubled')
+        return data
+
+    @transaction.atomic
+    def set_ingredients_and_tags(self, recipe, ingredients, tags):
+        recipe.tags.set(tags)
+        RecipeIngredient.objects.bulk_create(
+            [
+                RecipeIngredient(
+                    recipe=recipe,
+                    ingredient=Ingredient.objects.get(pk=ingredient['id']),
+                    amount=ingredient['amount'],
+                )
+                for ingredient in ingredients
+            ]
+        )
+
+    @transaction.atomic
     def create(self, validated_data):
         ingredients = validated_data.pop('ingredients')
-        if not ingredients:
-            raise serializers.ValidationError('Ingredients cannot be empty')
         tags = validated_data.pop('tags')
-        if len(tags) != len(set(tags)):
-            raise serializers.ValidationError('Tags should not be doubled')
         recipe = Recipe.objects.create(**validated_data)
-        recipe.tags.set(tags)
-        ingredients_id = Ingredient.objects.values_list('id', flat=True)
-        for ingredient in ingredients:
-            if ingredient.get('id') not in ingredients_id:
-                recipe.delete()
-                raise serializers.ValidationError('Ingredient does not exist')
-            amount = ingredient.get('amount')
-            try:
-                obj, created = RecipeIngredient.objects.select_related(
-                    'ingredient', 'recipe'
-                ).get_or_create(
-                    ingredient_id=ingredient.get('id'),
-                    recipe=recipe,
-                    amount=amount,
-                )
-            except IntegrityError:
-                recipe.delete()
-                raise serializers.ValidationError(
-                    'Ingredients should not be doubled'
-                )
-            if not created:
-                recipe.delete()
-                raise serializers.ValidationError(
-                    'Ingredients should not be doubled'
-                )
+        self.set_ingredients_and_tags(
+            recipe=recipe, ingredients=ingredients, tags=tags
+        )
         return recipe
 
-    def create_or_update_ingredients(self, ingredients, recipe_id):
-        if not ingredients:
-            raise serializers.ValidationError('Ingredients cannot be empty')
-        ingr_set = set()
-        for ingredient in ingredients:
-            try:
-                ing = Ingredient.objects.get(id=ingredient.get('id'))
-            except Ingredient.DoesNotExist:
-                raise serializers.ValidationError('Ingredient does not exist')
-            if ingredient.get('id') in ingr_set:
-                raise serializers.ValidationError(
-                    'Ingredients cannot be doubled'
-                )
-            ingr_set.add(ingredient.get('id'))
-            amount = ingredient.get('amount')
-            RecipeIngredient.objects.create(
-                ingredient=ing,
-                recipe=Recipe.objects.get(id=recipe_id),
-                amount=amount,
-            )
-        return
-
+    @transaction.atomic
     def update(self, instance, validated_data):
-        ingredients_data = validated_data.pop('ingredients', [])
-        if not validated_data.get('tags'):
-            raise serializers.ValidationError('Tags should be in request')
+        ingredients = validated_data.pop('ingredients', [])
         tags = validated_data.pop('tags', [])
-        if len(tags) != len(set(tags)):
-            raise serializers.ValidationError('Tags cannot repeat')
-        recipe_id = instance.id
         instance.name = validated_data.get('name', instance.name)
         instance.text = validated_data.get('text', instance.text)
         instance.cooking_time = validated_data.get(
@@ -215,8 +197,9 @@ class CreateRecipeSerializer(serializers.ModelSerializer):
         )
         instance.image = validated_data.get('image', instance.image)
         RecipeIngredient.objects.filter(recipe=instance).delete()
-        self.create_or_update_ingredients(ingredients_data, recipe_id)
-        instance.tags.set(tags)
+        self.set_ingredients_and_tags(
+            recipe=instance, ingredients=ingredients, tags=tags
+        )
         instance.save()
         return instance
 
@@ -274,6 +257,7 @@ class UserSubscribeSerializer(UserSerializerDjango, UserMixinSerializer):
         user = get_object_or_404(User, pk=obj.pk)
         return user.recipies.count()
 
+    @transaction.atomic
     def create(self, validated_data):
         user_to_follow = validated_data['user_to_follow']
         user = validated_data['user']
