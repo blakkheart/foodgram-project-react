@@ -14,13 +14,14 @@ class RelationMixin:
         try:
             recipe = Recipe.objects.get(pk=self.kwargs.get('pk'))
         except Recipe.DoesNotExist:
-            raise serializers.ValidationError('Recipe does nott exist')
+            raise serializers.ValidationError('Такой рецепт не существует')
         obj, created = model.objects.get_or_create(user=user, recipe=recipe)
         if created:
             serializer = ShortRecipeSerializer(recipe)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(
-            {'errors': 'Already exists'}, status=status.HTTP_400_BAD_REQUEST,
+            {'errors': 'Рецепт уже существует.'},
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
     def delete_relation(self, request, model):
@@ -32,6 +33,6 @@ class RelationMixin:
             return Response(status=status.HTTP_204_NO_CONTENT)
         except model.DoesNotExist:
             return Response(
-                {'errors': 'Does not exist'},
+                {'errors': 'Рецепт не сущестует.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )

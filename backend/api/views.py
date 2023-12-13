@@ -134,6 +134,6 @@ class SubscribeView(
         ).delete()
         if not del_count:
             raise serializers.ValidationError(
-                'You were not subscribed at the first place'
+                'Вы не были подписаны на данного автора.'
             )
         return Response(status=status.HTTP_204_NO_CONTENT)

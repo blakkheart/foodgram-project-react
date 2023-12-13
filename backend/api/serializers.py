@@ -119,7 +119,9 @@ class CreateIngredientSerializer(serializers.ModelSerializer):
 
     def validate_amount(self, value):
         if value < 1:
-            raise serializers.ValidationError('Amount cannot be less then 1')
+            raise serializers.ValidationError(
+                'Поле amount не может быть меньше 1.'
+            )
         return value
 
 
@@ -145,21 +147,27 @@ class CreateRecipeSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if not data.get('tags'):
-            raise serializers.ValidationError('Tags cannot be empty')
+            raise serializers.ValidationError(
+                'Поле tags не может быть пустым.'
+            )
         if not data.get('ingredients'):
-            raise serializers.ValidationError('Ingredients cannot be empty')
+            raise serializers.ValidationError(
+                'Поле ingredients не может быть пустым.'
+            )
         if len(data.get('tags')) != len(set(data.get('tags'))):
-            raise serializers.ValidationError('Tags cannot be doubled')
+            raise serializers.ValidationError('Теги не могут дублироваться.')
         ingredients_ids_from_db = set(
             Ingredient.objects.values_list('id', flat=True)
         )
         ingredient_ids = []
         for ingredient in data.get('ingredients'):
             if ingredient.get('id') not in ingredients_ids_from_db:
-                raise serializers.ValidationError('Ingredient does not exist')
+                raise serializers.ValidationError('Ингредиент не существует.')
             ingredient_ids.append(ingredient.get('id'))
         if len(ingredient_ids) != len(set(ingredient_ids)):
-            raise serializers.ValidationError('Ingredients cannot be doubled')
+            raise serializers.ValidationError(
+                'Ингрединты не могут дублироваться.'
+            )
         prepared_ingredients = Ingredient.objects.filter(id__in=ingredient_ids)
         data['prepared_ingredients'] = prepared_ingredients
         return data
@@ -217,7 +225,7 @@ class CreateRecipeSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         if not isinstance(instance, Recipe):
-            raise Exception('Unexpected type of tagged object')
+            raise Exception('Неожиданный инстанс!')
         instance = self.context['view'].get_queryset().get(id=instance.pk)
         serializer = RecipeSerializer(instance, context=self.context)
         return serializer.data
@@ -277,7 +285,7 @@ class UserSubscribeSerializer(UserSerializerDjango, UserMixinSerializer):
             user=user_to_follow, following_user=user
         )
         if not created:
-            raise serializers.ValidationError('Cannot subscribe twice')
+            raise serializers.ValidationError('Нельзя подписаться дважды.')
         return user_to_follow
 
     def validate(self, data):
@@ -287,7 +295,9 @@ class UserSubscribeSerializer(UserSerializerDjango, UserMixinSerializer):
             User, username=self.context.get('request').user.username
         )
         if user == user_to_follow:
-            raise serializers.ValidationError('Cannot subscribe to yourself')
+            raise serializers.ValidationError(
+                'Нельзя подписаться на самого себя.'
+            )
         data['user_to_follow'] = user_to_follow
         data['user'] = user
         return data
